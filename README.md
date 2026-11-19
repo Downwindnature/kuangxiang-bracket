@@ -1,0 +1,133 @@
+# 狂想之息｜賽程表（GitHub Pages + Firebase）
+
+前台顯示屏 + 後台管理，純靜態網頁，放在 GitHub Pages 就能用；資料與後台登入用 Firebase。
+
+| 檔案 | 用途 |
+|---|---|
+| `index.html` | 前台顯示屏（固定 1920×1080 畫面，自動縮放） |
+| `admin.html` | 後台（顯示屏設定／表單匯入／選手抽籤／重置／回到前台），要登入 |
+| `js/firebase-config.js` | **唯一要自己填的檔案**：貼上 Firebase 的設定 |
+| `database.rules.json` | Firebase Realtime Database 的安全規則 |
+| `apps-script/賽程表同步.gs` | Google 表單同步用（已經放進你的 Apps Script 專案「狂想之息報名表產生器」） |
+
+> 這個網站要用網址開啟（GitHub Pages 或本機伺服器），直接雙擊 `index.html` 不能用。
+
+---
+
+## 先試用（還沒設定 Firebase 也可以）
+
+`js/firebase-config.js` 的 `apiKey` 是空的時候，網站會用 **單機測試模式**：資料只存在這台電腦的瀏覽器，同一個瀏覽器開的前台分頁會同步更新。後台不用登入，適合先熟悉操作。
+
+示範畫面（不會讀寫任何資料）：
+
+- `index.html?demo=18`：18 隊（依規則 二-3 的輪空方式）
+- `index.html?demo=18&mode=pow2`：18 隊（補滿 2 的次方，像設計稿那樣第 1 輪只打 2 場）
+- 還可以加：`&played=0.5`（打完一半）、`&banner=vs`／`live`／`next`／`result`／`custom`／`draw`、`&stage=teams`（參賽名單）、`&reveal=0.5`（揭曉一半）
+
+## 1. 上傳到 GitHub
+
+1. GitHub 新增 repository（例如 `kuangxiang-bracket`），把這個資料夾裡的**所有檔案**上傳（保持 `css/`、`js/` 資料夾結構）。
+2. repository 的 **Settings → Pages** → Source 選 **Deploy from a branch** → Branch 選 `main`、資料夾 `/ (root)` → Save。
+3. 等 1～2 分鐘，網址會是 `https://你的帳號.github.io/kuangxiang-bracket/`（後台是 `…/admin.html`）。
+
+## 2. 建立 Firebase 專案
+
+1. 到 <https://console.firebase.google.com> → **新增專案**（Google Analytics 可以不開）。
+2. 左側選單找到 **Realtime Database** → **建立資料庫** → 位置選 **asia-southeast1（新加坡）** → 以**鎖定模式**開始。
+3. 專案設定（齒輪）→ **一般設定** → 下方「你的應用程式」按 **`</>`（網頁）** → 取個名字註冊（不用勾 Firebase Hosting）。
+4. 畫面會出現 `const firebaseConfig = { … }`，把裡面的值逐一貼到 `js/firebase-config.js`：
+
+```js
+export const FIREBASE_CONFIG = {
+  apiKey: 'AIza……',
+  authDomain: '你的專案.firebaseapp.com',
+  databaseURL: 'https://你的專案-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId: '你的專案',
+  storageBucket: '……',
+  messagingSenderId: '……',
+  appId: '……',
+};
+```
+
+`databaseURL` 一定要有；如果設定裡沒有，到 Realtime Database 頁面最上方複製資料庫網址貼上。
+
+> `apiKey` 這些值本來就會公開在網頁上，不是密碼。資料安全靠第 4 步的規則；後台帳號密碼存在 Firebase Authentication，網頁程式碼裡沒有，按 F12 也看不到。
+
+## 3. 建立後台帳號（Authentication）
+
+1. 左側選單 **Authentication** → 開始使用 → **登入方式（Sign-in method）** → 啟用 **電子郵件/密碼** → 儲存。
+2. **使用者（Users）** → **新增使用者**：
+   - 電子郵件可以用自己的 Gmail，也可以自訂像 `admin@kuangxiang.local` 這樣的帳號（後台登入時只要打 `admin`，會自動補上 `@kuangxiang.local`）。
+   - 密碼自己設定。
+3. 複製這個使用者的 **使用者 UID**（下一步要用）。
+4. 建議：**Authentication → 設定（Settings）→ 使用者動作（User actions）** → 取消勾選「**啟用建立（註冊）／Enable create (sign-up)**」，這樣別人沒辦法自己註冊帳號（就算註冊了，沒有在第 4 步加進管理員也改不了任何資料）。
+
+## 4. 貼上規則、把帳號設成管理員
+
+1. **Realtime Database → 規則（Rules）** → 把 `database.rules.json` 的內容整個貼上 → **發布**。
+2. **Realtime Database → 資料（Data）** → 在最上層按 **＋** 新增：
+
+```
+kxBracket
+ └ admins
+    └ （貼上 UID） : true
+```
+
+（值要選布林值 `true`，不是文字 "true"。）
+
+3. 打開 `admin.html` 登入。如果登入後看到「這個帳號沒有管理權限」，畫面上會顯示 UID，照上面加進 `admins` 就好。
+4. 要加其他管理員：再新增一個使用者，把他的 UID 也加到 `admins`。
+
+## 5. Google 表單同步（選用）
+
+`賽程表同步.gs` 已經放進 Apps Script 專案「狂想之息報名表產生器」，還差兩步：
+
+1. 打開那個專案 → 上方函式選單選 **setupBracketSync** → ▷ 執行 → 下方「執行紀錄」會顯示**同步金鑰**。
+2. **部署 → 新增部署作業** → 類型「**網頁應用程式**」→ 執行身分「**我**」、存取權「**所有人**」→ 部署 → 複製「網頁應用程式網址」。
+3. 後台 → **表單匯入 → 同步設定** → 貼上網址與金鑰 → 測試連線 → 儲存。
+
+之後按「從 Google 表單同步」就會抓到最新回覆（同一筆回覆不會重複；在後台手動修改過的資料，同步時會保留）。沒有金鑰的人打開網址只會得到 `unauthorized`。
+
+不想部署也可以：回覆試算表 → 檔案 → 下載 → **Microsoft Excel（.xlsx）** 或 CSV → 後台「表單匯入」拖進去。
+
+---
+
+## 比賽當天的流程
+
+1. **表單匯入**：同步 Google 表單（或匯入 Excel／CSV）→ 看統計，處理「需要確認」的資料（缺 ID、ID 重複報名…）。點任何一筆可以修改或設成「不列入」。
+2. **選手抽籤**
+   - ① **隨機媒合組隊**：3 人報名直接成隊；2 人報名各配 1 位 1 人報名；剩下的 1 人報名每 3 位一隊。點一位選手再點另一位（或空位）可以交換；★ 是隊長。
+   - ② 選**輪空方式** → **抽籤**。點兩隊可以交換位置（例如指定由哪一隊輪空）。
+   - ③ **一次公布全部**，或 **逐一揭曉**（直播抽籤用：前台先全部顯示「？」，每按一次揭曉一隊，也可以自動每幾秒揭曉一隊）。
+3. **顯示屏設定 → 通知看板**：選目前場次 → **開始這場**（前台顯示「A VS B」→「正在比賽中」→ 每隔幾秒跳出「下一場 C VS D 請準備」）→ **結束本場、登錄比分** → **開始下一場**…
+   - 時間、文字範本、自訂公告都可以在這裡改。
+   - **賽程與比分**：每場的時間、比分、勝方；也可以「自動排時間」（支援跨過午夜，例如 21:00 → 01:00）。
+   - **顯示內容與外觀**：前台顯示什麼（自動／空白／參賽名單／賽程表）、隊名顯示方式、季軍賽、比分、按鈕等。
+4. **重置**：全部清空（前台也會變空白）。按錯了可以按「**返回**」，或從「還原紀錄」還原到任何一個時間點（匯入、同步、媒合、抽籤之前都會自動備份）。
+
+## 輪空方式
+
+- **依比賽規則 二-3（預設）**：每一輪隊伍數是單數時，抽 1 隊輪空直接晉級下一輪；會盡量讓不同的隊伍輪空。例如 18 隊：第 1 輪 9 場 → 第 2 輪 9 隊（4 場＋1 隊輪空）→ 第 3 輪 5 隊（2 場＋1 隊輪空）→ 第 4 輪 3 隊（1 場＋1 隊輪空）→ 冠軍賽。
+- **補滿到 2 的次方**：例如 18 隊 → 32 格，第 1 輪只打 2 場，其他 14 隊直接進下一輪，之後就沒有輪空。
+- 季軍賽只有在兩場準決賽都是正式比賽時才會產生（例如 3 隊時沒有季軍賽）。
+
+## 前台網址參數
+
+- `?obs=1`：隱藏「進入後台」按鈕和滑鼠游標（OBS 擷取用；OBS「瀏覽器」來源寬 1920、高 1080）。
+- `?local`：強制單機測試模式。
+- `?demo=…`：示範畫面（見上方）。
+
+## 資料放在哪裡
+
+- `kxBracket/public`（所有人都能讀）：前台需要的隊伍名稱、賽程、比分、看板文字。**不含**遊戲 ID、Discord 等個人資料；參賽名單只有在「顯示內容」選了參賽名單時才會放上來；逐一揭曉時還沒揭曉的隊伍也不會出現在這裡。
+- `kxBracket/private`（只有管理員）：完整報名資料、隊伍、Google 同步設定、玩家名冊。
+- `kxBracket/history`、`kxBracket/historyData`（只有管理員）：還原紀錄。
+- 想換節點名稱：改 `js/firebase-config.js` 的 `DB_ROOT`，`database.rules.json` 裡的 `kxBracket` 也要一起改。
+
+## 常見問題
+
+- **前台一直是空白**：要在「選手抽籤 ③」公布，而且「顯示內容」是「自動」或「賽程表」。
+- **後台出現 permission denied**：規則沒有發布，或 UID 沒有加進 `kxBracket/admins`。
+- **登入說還沒啟用電子郵件／密碼登入**：做第 3 步的第 1 點。
+- **Excel 匯入失敗**：讀 Excel 的元件要連網路下載；也可以改匯入 CSV。從 Excel 另存的 CSV（Big5 編碼）也讀得到。
+- **玩家名冊比對**：「表單匯入」頁可以匯入「狂想之息玩家名字紀錄表」，會用遊戲 ID 標出常用稱呼與現居地，找不到的會標「名冊無此 ID」。

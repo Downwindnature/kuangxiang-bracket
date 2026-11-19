@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>狂想之息｜賽程表後台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%8F%86%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/bracket.css">
+  <link rel="stylesheet" href="css/banner.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script>
+    if (location.protocol === 'file:') {
+      document.addEventListener('DOMContentLoaded', function () {
+        var d = document.createElement('div');
+        d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;background:#0b0624;color:#fff;font:18px/1.7 "Microsoft JhengHei",sans-serif;text-align:center';
+        d.innerHTML = '這個網站要用網址開啟，不能直接雙擊檔案。<br>請上傳到 GitHub Pages，或用 VS Code 的 Live Server 開啟（README 有說明）。';
+        document.body.appendChild(d);
+      });
+    }
+  </script>
+</head>
+<body class="admin">
+  <div class="space-bg dim" aria-hidden="true"><canvas id="stars"></canvas></div>
+  <div id="app"><div class="boot">載入中…</div></div>
+  <div id="modals"></div>
+  <div id="toasts"></div>
+  <script type="module" src="js/admin/main.js"></script>
+</body>
+</html>

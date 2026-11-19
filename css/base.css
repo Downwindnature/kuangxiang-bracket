@@ -1,0 +1,95 @@
+/* base.css — 共用色彩、字型、星空背景 */
+:root {
+  --font: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", "Heiti TC", "Microsoft YaHei", sans-serif;
+  --violet: #9b5cff;
+  --violet-2: #6b3df0;
+  --blue: #3d6cff;
+  --cyan: #52d8ff;
+  --gold: #ffd36b;
+  --pink: #ff74d8;
+  --red: #ff4d6d;
+  --ink: #f5f3ff;
+  --ink-2: #c4bdf0;
+  --ink-3: #8d86c4;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: #07031a;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── 星空 + 霓虹地平線格線 ── */
+.space-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  background:
+    radial-gradient(55% 60% at 74% 42%, rgba(186, 92, 255, .62) 0%, rgba(126, 56, 236, .28) 42%, transparent 72%),
+    radial-gradient(45% 45% at 16% 26%, rgba(78, 58, 220, .38), transparent 72%),
+    radial-gradient(70% 30% at 50% 62%, rgba(90, 110, 255, .30), transparent 75%),
+    linear-gradient(180deg, #070220 0%, #150945 40%, #261070 60%, #20105e 70%, #0c0530 100%);
+}
+.space-bg canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.space-bg .horizon {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: 57%;
+  height: 10%;
+  background: radial-gradient(50% 100% at 50% 100%, rgba(140, 150, 255, .55), transparent 72%);
+  filter: blur(8px);
+}
+.grid-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 43%;
+  overflow: hidden;
+  perspective: 280px;
+  perspective-origin: 50% 0%;
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, .25) 0%, rgba(0, 0, 0, .8) 14%, #000 40%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, .25) 0%, rgba(0, 0, 0, .8) 14%, #000 40%);
+}
+.grid-plane {
+  position: absolute;
+  left: -150%;
+  right: -150%;
+  top: 0;
+  height: 300%;
+  transform-origin: 50% 0%;
+  transform: rotateX(72deg);
+  background-image:
+    linear-gradient(rgba(80, 175, 255, .95) 0 2px, transparent 2px),
+    linear-gradient(90deg, rgba(80, 175, 255, .95) 0 2px, transparent 2px);
+  background-size: 58px 58px;
+  background-position: 50% 0;
+  filter: drop-shadow(0 0 4px rgba(70, 170, 255, .95));
+  animation: kx-grid 2.2s linear infinite;
+}
+.grid-wrap::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 30%;
+  background: linear-gradient(180deg, rgba(150, 170, 255, .35), transparent);
+  pointer-events: none;
+}
+.no-motion .grid-plane { animation: none; }
+@keyframes kx-grid { to { background-position: 50% 58px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-plane { animation: none; }
+}

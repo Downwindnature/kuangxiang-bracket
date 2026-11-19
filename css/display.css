@@ -1,0 +1,54 @@
+/* display.css — 前台顯示屏（固定 1920×1080 畫布，等比縮放到視窗） */
+body.display { overflow: hidden; }
+#viewport { position: fixed; inset: 0; z-index: 1; overflow: hidden; }
+#stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+}
+#stage .banner { left: 220px; width: 1480px; top: 26px; height: 156px; }
+.board { position: absolute; left: 26px; top: 210px; width: 1868px; height: 800px; }
+
+.admin-btn {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 9px 30px;
+  border-radius: 10px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: #fff;
+  text-decoration: none;
+  background: rgba(30, 16, 80, .72);
+  box-shadow: 0 0 0 1.5px rgba(170, 140, 255, .85), 0 0 18px rgba(120, 90, 255, .5);
+  transition: background .2s, box-shadow .2s;
+}
+.admin-btn:hover { background: rgba(70, 40, 170, .85); box-shadow: 0 0 0 2px #c9b6ff, 0 0 26px rgba(150, 110, 255, .9); }
+.admin-btn[hidden] { display: none; }
+.obs .admin-btn { display: none; }
+.obs { cursor: none; }
+
+/* 參賽名單 */
+.tl { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; }
+.tl-head { font-size: 40px; font-weight: 900; letter-spacing: 6px; margin: 4px 0 18px; text-shadow: 0 0 14px rgba(170, 120, 255, .95); }
+.tl-grid { display: grid; gap: 14px 16px; width: 100%; align-content: start; justify-content: center; }
+.tl-card {
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(42, 58, 170, .82), rgba(20, 26, 96, .86));
+  box-shadow: 0 0 0 1.5px rgba(150, 168, 255, .85), 0 0 14px rgba(80, 110, 255, .4);
+  min-width: 0;
+}
+.tl-name { font-size: 24px; font-weight: 900; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-mem { margin-top: 4px; font-size: 17px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-mem b { color: var(--gold); font-weight: 800; }
+.tl-sec { width: 100%; font-size: 24px; font-weight: 800; color: var(--ink-2); margin: 18px 0 10px; text-align: center; letter-spacing: 3px; }
+.tl-chip { display: inline-block; margin: 4px 6px; padding: 6px 14px; border-radius: 999px; background: rgba(60, 40, 150, .7); box-shadow: 0 0 0 1px rgba(160, 140, 255, .6); font-size: 19px; font-weight: 700; }
+
+.offline-dot { position: absolute; right: 16px; bottom: 14px; padding: 4px 10px; border-radius: 8px; font-size: 14px; background: rgba(255, 60, 90, .85); color: #fff; }
+.offline-dot[hidden] { display: none; }

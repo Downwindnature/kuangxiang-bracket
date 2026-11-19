@@ -1,0 +1,28 @@
+{
+  "rules": {
+    "kxBracket": {
+      "public": {
+        ".read": true,
+        ".write": "auth != null && root.child('kxBracket/admins/' + auth.uid).val() === true"
+      },
+      "private": {
+        ".read": "auth != null && root.child('kxBracket/admins/' + auth.uid).val() === true",
+        ".write": "auth != null && root.child('kxBracket/admins/' + auth.uid).val() === true"
+      },
+      "history": {
+        ".read": "auth != null && root.child('kxBracket/admins/' + auth.uid).val() === true",
+        ".write": "auth != null && root.child('kxBracket/admins/' + auth.uid).val() === true"
+      },
+      "historyData": {
+        ".read": "auth != null && root.child('kxBracket/admins/' + auth.uid).val() === true",
+        ".write": "auth != null && root.child('kxBracket/admins/' + auth.uid).val() === true"
+      },
+      "admins": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": false
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,93 @@
+/* banner.css — 頂端固定顯示屏（通知看板） */
+.banner {
+  position: absolute;
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(36, 18, 96, .80), rgba(14, 8, 52, .82));
+  box-shadow:
+    0 0 0 2px rgba(160, 130, 255, .95),
+    0 0 0 5px rgba(90, 60, 220, .35),
+    0 0 34px rgba(130, 90, 255, .65),
+    inset 0 0 46px rgba(100, 70, 230, .35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  text-align: center;
+  padding: 10px 36px;
+}
+.banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, .10) 45%, transparent 55%);
+  transform: translateX(-100%);
+  animation: kx-sheen 6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes kx-sheen { 0%, 60% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+.bn-inner { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.bn-inner.enter { animation: kx-bn-in .55s cubic-bezier(.2, 1.2, .3, 1) 1; }
+@keyframes kx-bn-in { 0% { opacity: 0; transform: translateY(18px) scale(.96); } 100% { opacity: 1; transform: none; } }
+
+.fit { white-space: nowrap; overflow: hidden; max-width: 100%; }
+.bn-title { font-size: 58px; font-weight: 900; letter-spacing: 6px; color: #fff; text-shadow: 0 0 16px rgba(180, 130, 255, .95); }
+.bn-sub { font-size: 26px; font-weight: 700; color: var(--ink-2); letter-spacing: 2px; }
+.bn-kicker { font-size: 24px; font-weight: 800; color: var(--ink-2); letter-spacing: 4px; min-height: 30px; }
+.bn-kicker.sm { font-size: 20px; min-height: 24px; }
+.bn-line { width: 100%; font-weight: 900; color: #fff; line-height: 1.15; }
+.bn-big { font-size: 64px; }
+.bn-mid { font-size: 48px; }
+.bn-line .tk { display: inline-block; padding: 0 .08em; }
+.bn-line .tA { color: #8fd8ff; text-shadow: 0 0 14px rgba(80, 190, 255, .95); }
+.bn-line .tB { color: #ff9be4; text-shadow: 0 0 14px rgba(255, 100, 210, .95); }
+.bn-line .tW { color: var(--gold); text-shadow: 0 0 16px rgba(255, 200, 80, .95); }
+.bn-line .tX { color: #fff; }
+.bn-line .tk-txt { color: #fff; text-shadow: 0 0 10px rgba(160, 120, 255, .8); }
+.bn-line .tk-vs {
+  display: inline-block;
+  margin: 0 .3em;
+  font-style: italic;
+  font-size: 1.12em;
+  color: #fff;
+  background: linear-gradient(180deg, #fff 0%, #ffe08a 60%, #ff9a4d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 170, 70, .95));
+}
+.is-vs .tA { animation: kx-from-left .7s cubic-bezier(.2, 1.3, .3, 1) 1; }
+.is-vs .tB { animation: kx-from-right .7s cubic-bezier(.2, 1.3, .3, 1) 1; }
+.is-vs .tk-vs { animation: kx-vs-pop .8s cubic-bezier(.2, 1.8, .3, 1) .15s 1 both; }
+@keyframes kx-from-left { 0% { transform: translateX(-260px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes kx-from-right { 0% { transform: translateX(260px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes kx-vs-pop { 0% { transform: scale(3); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+.bn-pill {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #fff;
+}
+.bn-pill.live { background: rgba(255, 60, 100, .9); box-shadow: 0 0 16px rgba(255, 60, 100, .9); }
+.bn-pill.live i { width: 11px; height: 11px; border-radius: 50%; background: #fff; animation: kx-blink 1s steps(2) infinite; }
+@keyframes kx-blink { 50% { opacity: .15; } }
+.bn-pill.next { background: rgba(255, 170, 40, .92); color: #2a1300; box-shadow: 0 0 16px rgba(255, 170, 40, .85); }
+.bn-pill.draw { background: rgba(90, 200, 255, .9); color: #04203a; box-shadow: 0 0 16px rgba(90, 200, 255, .85); }
+.is-next .bn-line .tk-txt { color: #ffe2a8; }
+.is-champ .bn-line { font-size: 60px; }
+.bn-trophy { display: inline-block; margin-right: .2em; animation: kx-bounce 1.2s ease-in-out infinite; }
+@keyframes kx-bounce { 50% { transform: translateY(-8px); } }
+.bn-custom { width: 100%; }
+.bn-cline { font-size: 46px; font-weight: 900; color: #fff; text-shadow: 0 0 14px rgba(170, 120, 255, .95); line-height: 1.2; }
+.bn-custom .bn-cline + .bn-cline { font-size: 32px; color: var(--ink-2); }
