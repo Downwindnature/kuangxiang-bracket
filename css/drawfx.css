@@ -1,0 +1,122 @@
+/* drawfx.css — 前台抽籤球動畫（舞台 1920×1080 座標） */
+.dfx { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.dfx[hidden] { display: none; }
+.dfx-back {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 196px;
+  bottom: 0;
+  background:
+    radial-gradient(42% 52% at 50% 50%, rgba(70, 36, 170, .55), rgba(28, 12, 80, .35) 60%, transparent 80%),
+    linear-gradient(180deg, rgba(8, 4, 30, .93), rgba(6, 3, 24, .96));
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 26px);
+  mask-image: linear-gradient(180deg, transparent 0, #000 26px);
+}
+.dfx-title { position: absolute; left: 0; right: 0; top: 204px; text-align: center; }
+.dfx-n {
+  font-size: 56px;
+  font-weight: 900;
+  letter-spacing: 10px;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(180, 130, 255, .95), 0 3px 0 rgba(60, 20, 140, .9);
+}
+.dfx-sub { margin-top: -2px; font-size: 24px; font-weight: 800; letter-spacing: 8px; color: var(--ink-2); }
+.dfx-sub i { font-style: normal; animation: kx-dot 1.2s infinite; }
+.dfx-sub i:nth-child(2) { animation-delay: .2s; }
+.dfx-sub i:nth-child(3) { animation-delay: .4s; }
+@keyframes kx-dot { 0%, 100% { opacity: .2; } 40% { opacity: 1; } }
+
+.dfx-drum {
+  position: absolute;
+  left: 610px;           /* 960 - 350 */
+  top: 268px;            /* 668 - 400 */
+  width: 700px;
+  height: 780px;
+  transform-origin: 350px 400px;
+  will-change: transform, opacity;
+}
+.dfx-burst {
+  position: absolute;
+  left: 960px;
+  top: 346px;            /* 出口管頂端 */
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, .95) 0%, rgba(190, 230, 255, .55) 28%, rgba(150, 110, 255, .25) 50%, transparent 70%);
+  opacity: 0;
+}
+.dfx-vs {
+  position: absolute;
+  left: 960px;
+  top: 640px;
+  font-size: 150px;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+  padding: 0 .12em;
+  color: #fff;
+  background: linear-gradient(180deg, #fff 0%, #ffe08a 58%, #ff9a4d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 18px rgba(255, 170, 70, .95)) drop-shadow(0 4px 0 rgba(120, 40, 10, .8));
+  opacity: 0;
+}
+
+/* 抽出來的球（放大後 350px，名稱寫在中間的白色圓面上） */
+.dfx-ball {
+  --c1: #d2f6ff;
+  --c2: #33cfff;
+  --c3: #05638f;
+  --glow: rgba(60, 200, 255, .85);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 350px;
+  height: 350px;
+  border-radius: 50%;
+  transform-origin: 175px 175px;
+  background: radial-gradient(circle at 33% 27%, #fff 0 3%, var(--c1) 14%, var(--c2) 48%, var(--c3) 100%);
+  box-shadow: 0 0 46px var(--glow), inset -22px -30px 50px rgba(0, 0, 0, .32), inset 14px 16px 30px rgba(255, 255, 255, .22);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.dfx-face {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 70%;
+  height: 70%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 36%, #fff 0%, #f4f1ff 55%, #d8d0f4 100%);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, .35), inset 0 -8px 16px rgba(40, 20, 90, .22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dfx-q {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 150px;
+  font-weight: 900;
+  color: #2a1866;
+}
+.dfx-name {
+  position: relative;
+  width: 82%;
+  max-height: 180px;
+  overflow: hidden;
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 1.14;
+  color: #1d1147;
+  text-align: center;
+  word-break: break-all;
+  text-wrap: balance;
+  opacity: 0;
+}

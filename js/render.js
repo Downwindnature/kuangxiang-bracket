@@ -58,10 +58,12 @@ export function renderBracket(el, pub, opts = {}) {
       if (leaf != null && prev.leaves && prev.leaves[leaf] === '?') cls += ' flash';
       if (n.done && n.w === i && prev.wins && prev.wins[n.id] !== n.winner) cls += ' flash-win';
     }
-    if (opts.interactive && leaf != null && v !== undefined && v !== null) {
-      cls += ' pick';
+    if (leaf != null && v !== undefined && v !== null) {
       extra = ` data-leaf="${leaf}"`;
-      if (opts.selectedLeaf === leaf) cls += ' picked';
+      if (opts.interactive) {
+        cls += ' pick';
+        if (opts.selectedLeaf === leaf) cls += ' picked';
+      }
     }
     if (!showScores) score = '';
     const crown = kind === 'final' && n.done && n.w === i ? '<span class="mb-crown">👑</span>' : '';

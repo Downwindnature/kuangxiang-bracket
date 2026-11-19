@@ -1,17 +1,20 @@
 // admin/page-draw.js — 選手抽籤：組隊媒合 → 賽程抽籤（含輪空設定）→ 公布／逐一揭曉
-import { S, saveTeams, saveBracket, saveBanner, saveSettings, snapshot, emit, rm, teamNames } from './state.js';
+import { S, saveTeams, saveBracket, saveBanner, saveSettings, saveDraw, snapshot, emit, rm, teamNames } from './state.js';
 import { buildTeams, refreshTeams, swapMembers, memberInfo, teamComplete } from '../matcher.js';
-import { createBracket, analyze, makeMask, byeSummary, roundCounts, roundNames, swapLeaves, publicView, teamCount, MODE_ODD, MODE_POW2, MAX_TEAMS, shuffle, cryptoRandom } from '../bracket.js';
+import { createBracket, analyze, makeMask, byeSummary, roundCounts, roundNames, swapLeaves, publicView, teamCount, revealSteps, revealPending, MODE_ODD, MODE_POW2, MAX_TEAMS } from '../bracket.js';
 import { renderBracket } from '../render.js';
 import { regStats } from '../importer.js';
-import { withDefaults } from '../banner.js';
+import { withDefaults, drawTiming, DRAW_FX } from '../banner.js';
 import { esc } from '../util.js';
 import { toast, confirmDlg } from './ui.js';
 import { rosterTag } from './page-import.js';
 
 let autoTimer = null;
-export function cleanup() { stopAuto(); }
-function stopAuto() { clearInterval(autoTimer); autoTimer = null; }
+let autoOn = false;
+let busyTimer = null;
+let stepping = false; // 正在寫入這一步（避免連點跳過一組）
+export function cleanup() { stopAuto(); clearInterval(busyTimer); busyTimer = null; }
+function stopAuto() { clearTimeout(autoTimer); autoTimer = null; autoOn = false; }
 
 const MODE_TEXT = {
   [MODE_ODD]: '依比賽規則 二-3：每一輪隊伍數為單數時，抽 1 隊輪空直接晉級',
@@ -237,9 +240,10 @@ function drawBracketStep(main) {
     S.bracket.reveal = null;
     S.bracket.drawnAt = Date.now();
     S.ui.pickLeaf = null;
+    stopAuto();
     await saveBracket();
-    if (S.banner.mode === 'flow' || S.banner.mode === 'result') {
-      S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'idle', cur: null }));
+    if (S.banner.mode === 'flow' || S.banner.mode === 'result' || S.banner.mode === 'draw') {
+      S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'idle', cur: null, draw: null }));
       await saveBanner();
     }
     emit('bracket');
@@ -249,6 +253,7 @@ function drawBracketStep(main) {
   if (box.querySelector('#dClear')) box.querySelector('#dClear').onclick = async () => {
     if (!(await confirmDlg('清除抽籤結果？前台的賽程會撤下（會先自動備份）。', { danger: true, ok: '清除' }))) return;
     await snapshot('清除抽籤前');
+    stopAuto();
     S.bracket = null;
     await saveBracket();
     S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'idle', cur: null, draw: null }));
@@ -281,33 +286,98 @@ function drawBracketStep(main) {
   }
 }
 
-// ── ③ 公布 ──
+// ── ③ 公布／直播抽籤 ──
+const FX_KEY = 'kxb-drawfx';
+const numIn = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
+function fxPrefs() {
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem(FX_KEY)) || {}; } catch (e) { p = {}; }
+  return { fx: p.fx !== false, tumble: numIn(p.tumble, 1, 10, DRAW_FX.tumble), hold: numIn(p.hold, 0.5, 15, DRAW_FX.hold), gap: numIn(p.gap, 0, 30, 1.5) };
+}
+function saveFxPrefs(p) { try { localStorage.setItem(FX_KEY, JSON.stringify(p)); } catch (e) { /* 無痕模式存不了就算了 */ } }
+
+// 前台的抽籤動畫還要播多久（毫秒，以伺服器時間計算，重新整理後台也算得出來）
+function busyLeftMs() {
+  const b = S.banner;
+  const d = b && b.mode === 'draw' ? b.draw : null;
+  if (!d || !d.at || d.kind !== 'pair' || !d.fx) return 0;
+  return Math.max(0, d.at + drawTiming(d).end * 1000 - S.store.now());
+}
+
+function startBusyTicker() {
+  clearInterval(busyTimer);
+  const tick = () => {
+    const left = busyLeftMs();
+    const btn = document.getElementById('rNext');
+    if (btn) {
+      btn.disabled = left > 0;
+      btn.textContent = left > 0 ? `前台動畫播放中…（${Math.ceil(left / 1000)} 秒）` : btn.dataset.label;
+    }
+    if (left <= 0) { clearInterval(busyTimer); busyTimer = null; }
+  };
+  busyTimer = setInterval(tick, 200);
+  tick();
+}
+
+function stepLabel(steps, i) {
+  const s = steps[i];
+  if (!s) return '';
+  if (s.pair) return `🎰 抽出第 ${steps.slice(0, i + 1).filter((x) => x.pair).length} 組`;
+  return s.l.length > 1 ? `揭曉剩下的 ${s.l.length} 隊` : '揭曉最後一隊';
+}
+
 function drawPublish(main) {
   const box = main.querySelector('#s3');
   const br = S.bracket;
   if (!br) { box.innerHTML = '<h3>③ 公布到顯示屏</h3><p class="hint">抽籤後才能公布。前台在公布之前都是空白。</p>'; return; }
   const total = teamCount(br);
   const rev = br.reveal;
-  const revealing = rev && rev.shown < rev.order.length;
-  const status = !br.published ? '尚未公布（前台空白）' : revealing ? `逐一揭曉中：${rev.shown} / ${rev.order.length}` : '已公布';
+  const steps = rev && Array.isArray(rev.steps) ? rev.steps : null;
+  const revealing = revealPending(rev);
+  const shown = (rev && rev.shown) || 0;
+  const pairsTotal = steps ? steps.filter((x) => x.pair).length : 0;
+  const pairsShown = steps ? steps.slice(0, shown).filter((x) => x.pair).length : 0;
+  const p = fxPrefs();
+  const names = teamNames();
+  const nm = (leaf) => esc(names[br.leaves[leaf]] || '未命名隊伍');
+  const status = !br.published ? '尚未公布（前台空白）'
+    : !revealing ? '已公布'
+      : steps ? `直播抽籤中：已抽出 ${pairsShown} / ${pairsTotal} 組` : `逐一揭曉中：${shown} / ${(rev.order || []).length}`;
+  let k = 0;
+  const drawn = steps ? steps.slice(0, shown).map((st) => (st.pair
+    ? `<li>第 ${++k} 組：<b>${nm(st.l[0])}</b> VS <b>${nm(st.l[1])}</b></li>`
+    : `<li>${st.l.length > 1 ? '剩下的隊伍' : '最後一隊'}：${st.l.map((l) => `<b>${nm(l)}</b>`).join('、')}</li>`)).reverse().join('') : '';
+  const label = steps ? stepLabel(steps, shown) : '';
+  const plan = revealSteps(br);
   box.innerHTML = `
     <h3>③ 公布到顯示屏 <span class="tag ${br.published ? 'ok' : ''}">${status}</span></h3>
     <div class="btns">
       <button id="pAll" class="primary">📢 一次公布全部</button>
-      <button id="pReveal">🎬 逐一揭曉（直播抽籤用）</button>
+      <button id="pReveal">🎰 直播抽籤（抽籤球動畫）</button>
       ${br.published ? '<button id="pHide" class="ghost">撤下賽程（前台變空白）</button>' : ''}
     </div>
-    ${revealing ? `
+    <div class="inline fx-opts">
+      <label class="chk"><input type="checkbox" id="fxOn" ${p.fx ? 'checked' : ''}> 播放抽籤球動畫</label>
+      <label>滾動 <input id="fxTumble" type="number" min="1" max="10" step="0.5" value="${p.tumble}" style="width:72px"> 秒</label>
+      <label>抽出後停留 <input id="fxHold" type="number" min="0.5" max="15" step="0.5" value="${p.hold}" style="width:72px"> 秒</label>
+    </div>
+    ${revealing && steps ? `
       <div class="reveal-box">
         <div class="btns">
-          <button id="rNext" class="primary big">揭曉下一隊（${rev.shown + 1} / ${rev.order.length}）</button>
-          <label>自動揭曉每 <input id="rSec" type="number" min="1" max="30" value="${S.ui.revealSec || 3}" style="width:70px"> 秒</label>
-          <button id="rAuto">${autoTimer ? '⏸ 暫停自動' : '▶ 自動揭曉'}</button>
+          <button id="rNext" class="primary big" data-label="${esc(label)}">${esc(label)}</button>
+          <button id="rAuto">${autoOn ? '⏸ 暫停自動抽籤' : '▶ 自動抽籤'}</button>
+          <div class="inline"><label>每組間隔 <input id="rGap" type="number" min="0" max="30" step="0.5" value="${p.gap}" style="width:72px"> 秒</label></div>
           <button id="rAllNow" class="ghost">直接全部揭曉</button>
         </div>
-        <p class="hint">前台會把還沒揭曉的位置顯示成「？」，看板顯示「第 N 籤：隊伍名稱」。</p>
+        <p class="hint">每按一次抽出一組（第一場會互相對戰的兩隊）：${p.fx ? `前台先播放約 ${p.tumble} 秒的抽籤球滾動動畫，接著跑出兩顆球顯示兩隊名稱，再飛進賽程表。` : '動畫已關閉，前台直接顯示這一組。'}沒有直接對手的隊伍（第 1 輪輪空）留到最後直接揭曉，不播動畫。自動抽籤時請讓這個後台分頁保持開啟。</p>
+        ${drawn ? `<ul class="drawn-list">${drawn}</ul>` : ''}
       </div>` : ''}
-    <p class="hint">公布後，前台顯示內容是「自動」或「賽程表」時就會出現賽程。${total} 隊。</p>`;
+    ${revealing && !steps ? `
+      <div class="reveal-box">
+        <p class="warn-box">這是舊版「逐一揭曉」的進度。請按「直接全部揭曉」，或按上面的「直播抽籤」從頭開始。</p>
+        <div class="btns"><button id="rAllNow" class="primary">直接全部揭曉</button></div>
+      </div>` : ''}
+    <p class="hint">公布後，前台顯示內容是「自動」或「賽程表」時就會出現賽程。${total} 隊，直播抽籤會分成 ${plan.filter((x) => x.pair).length} 組${plan.some((x) => !x.pair) ? '＋最後剩下的隊伍' : ''}。</p>`;
 
   const q = (id) => box.querySelector('#' + id);
   const ensureStage = async () => {
@@ -319,71 +389,102 @@ function drawPublish(main) {
   q('pAll').onclick = async () => {
     stopAuto();
     S.bracket = Object.assign({}, S.bracket, { published: true, reveal: null });
-    await saveBracket();
+    if (S.banner.mode === 'draw') S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'draw', at: S.store.now(), draw: { done: true, total } }));
     await ensureStage();
-    if (S.banner.mode === 'draw') {
-      S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'draw', draw: { n: total, total, done: true } }));
-      await saveBanner();
-    }
+    await saveDraw();
     emit('bracket');
     toast('賽程已公布到前台');
     render(main);
   };
   q('pReveal').onclick = async () => {
-    if (br.published && !revealing && !(await confirmDlg('重新從頭逐一揭曉？前台會先把所有隊伍變成「？」。', { ok: '開始揭曉' }))) return;
-    const order = shuffle(br.leaves.map((x, i) => (x ? i : -1)).filter((i) => i >= 0), cryptoRandom);
-    S.bracket = Object.assign({}, S.bracket, { published: true, reveal: { order, shown: 0 } });
-    await saveBracket();
+    if (revealing && !(await confirmDlg('從頭重新開始直播抽籤？已經抽出的組會先變回「？」。', { ok: '從頭開始' }))) return;
+    if (br.published && !revealing && !(await confirmDlg('重新開始直播抽籤？前台會先把所有隊伍變成「？」。', { ok: '開始' }))) return;
+    stopAuto();
+    const at = S.store.now();
+    S.bracket = Object.assign({}, S.bracket, { published: true, reveal: { steps: revealSteps(S.bracket), shown: 0 } });
+    S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'draw', at, draw: { kind: 'start', total, at } }));
     await ensureStage();
-    S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'draw', at: S.store.now(), draw: { n: 0, total: order.length } }));
-    await saveBanner();
+    await saveDraw();
     emit('bracket');
-    toast('開始逐一揭曉：前台目前全部是「？」');
+    toast('直播抽籤開始：前台目前全部是「？」');
     render(main);
   };
   if (q('pHide')) q('pHide').onclick = async () => {
     stopAuto();
     S.bracket = Object.assign({}, S.bracket, { published: false, reveal: null });
-    await saveBracket();
     if (S.banner.mode === 'draw' || S.banner.mode === 'flow' || S.banner.mode === 'result') {
       S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'idle', cur: null, draw: null }));
-      await saveBanner();
     }
+    await saveDraw();
     emit('bracket');
     toast('已撤下，前台變回空白');
     render(main);
   };
-  const step = async (all = false) => {
-    const r = S.bracket.reveal;
-    if (!r) return;
-    const shown = all ? r.order.length : Math.min(r.order.length, r.shown + 1);
-    const leaf = r.order[shown - 1];
-    const team = S.bracket.leaves[leaf];
-    const done = shown >= r.order.length;
-    S.bracket = Object.assign({}, S.bracket, { reveal: done ? null : { order: r.order, shown } });
-    await saveBracket();
-    const names = teamNames();
-    S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'draw', at: S.store.now(), draw: done && all ? { n: r.order.length, total: r.order.length, done: true } : { n: shown, total: r.order.length, team, name: names[team] || '' } }));
-    await saveBanner();
-    if (done) {
-      stopAuto();
-      if (!all) setTimeout(async () => {
-        if (S.banner.mode !== 'draw') return;
-        S.banner = withDefaults(Object.assign({}, S.banner, { draw: { n: r.order.length, total: r.order.length, done: true } }));
-        await saveBanner();
-      }, 4000);
-      toast('全部揭曉完成！');
-    }
+  const savePrefs = (patch) => { saveFxPrefs(Object.assign(fxPrefs(), patch)); };
+  q('fxOn').onchange = (e) => { savePrefs({ fx: e.target.checked }); drawPublish(main); };
+  q('fxTumble').onchange = (e) => { savePrefs({ tumble: numIn(e.target.value, 1, 10, DRAW_FX.tumble) }); drawPublish(main); };
+  q('fxHold').onchange = (e) => { savePrefs({ hold: numIn(e.target.value, 0.5, 15, DRAW_FX.hold) }); drawPublish(main); };
+  if (q('rGap')) q('rGap').onchange = (e) => { savePrefs({ gap: numIn(e.target.value, 0, 30, 1.5) }); };
+
+  // 抽出下一組（或最後剩下的隊伍）
+  const step = async () => {
+    const r = S.bracket && S.bracket.reveal;
+    if (!r || !Array.isArray(r.steps) || (r.shown || 0) >= r.steps.length) return;
+    if (stepping || busyLeftMs() > 0) return;
+    stepping = true;
+    const pr = fxPrefs();
+    const i = r.shown || 0;
+    const st = r.steps[i];
+    const last = i + 1 >= r.steps.length;
+    const nmap = teamNames();
+    const at = S.store.now();
+    const draw = {
+      kind: st.pair ? 'pair' : 'solo',
+      n: r.steps.slice(0, i + 1).filter((x) => x.pair).length,
+      pairs: r.steps.filter((x) => x.pair).length,
+      total: teamCount(S.bracket),
+      leaves: st.l.slice(),
+      names: st.l.map((l) => nmap[S.bracket.leaves[l]] || '未命名隊伍'),
+      fx: !!(st.pair && pr.fx),
+      tumble: pr.tumble,
+      hold: pr.hold,
+      pool: r.steps.slice(i).reduce((a, x) => a + x.l.length, 0),
+      last,
+      at,
+    };
+    S.bracket = Object.assign({}, S.bracket, { reveal: last ? null : { steps: r.steps, shown: i + 1 } });
+    S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'draw', at, draw }));
+    try { await saveDraw(); } finally { stepping = false; }
     emit('bracket');
+    if (last) { stopAuto(); toast('全部抽完了！'); }
+    else if (autoOn) scheduleAuto();
+    render(main);
+    startBusyTicker();
+  };
+  const scheduleAuto = () => {
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(() => {
+      if (!autoOn || !document.body.contains(main)) { stopAuto(); return; }
+      step();
+    }, busyLeftMs() + fxPrefs().gap * 1000);
+  };
+  if (q('rNext')) {
+    q('rNext').onclick = () => step();
+    if (busyLeftMs() > 0) startBusyTicker();
+  }
+  if (q('rAuto')) q('rAuto').onclick = () => {
+    if (autoOn) { stopAuto(); render(main); return; }
+    autoOn = true;
+    if (busyLeftMs() > 0) scheduleAuto(); else step();
     render(main);
   };
-  if (q('rNext')) q('rNext').onclick = () => step(false);
-  if (q('rAllNow')) q('rAllNow').onclick = () => step(true);
-  if (q('rAuto')) q('rAuto').onclick = () => {
-    if (autoTimer) { stopAuto(); render(main); return; }
-    const sec = Math.max(1, Math.min(30, Number(q('rSec').value) || 3));
-    S.ui.revealSec = sec;
-    autoTimer = setInterval(() => { if (!document.body.contains(main)) return stopAuto(); step(false); }, sec * 1000);
-    step(false);
+  if (q('rAllNow')) q('rAllNow').onclick = async () => {
+    stopAuto();
+    S.bracket = Object.assign({}, S.bracket, { reveal: null });
+    S.banner = withDefaults(Object.assign({}, S.banner, { mode: 'draw', at: S.store.now(), draw: { done: true, total } }));
+    await saveDraw();
+    emit('bracket');
+    toast('已全部揭曉');
+    render(main);
   };
 }

@@ -364,14 +364,54 @@ export function autoTimes(br0, { start = '21:00', every = 30, sameRound = false 
   return br;
 }
 
+// 直播抽籤的揭曉順序：每一步抽出「會直接對戰的兩隊」（依位置：先左半邊由上到下，再右半邊），
+// 第一場就要對上勝隊的隊伍（第 1 輪輪空）沒有直接的對手，留到最後一起揭曉
+export function revealSteps(br) {
+  if (!br) return [];
+  const A = analyze({ k: br.k, leaves: br.leaves, m: {}, third: false });
+  const pairs = [];
+  const used = new Set();
+  for (let p = 1; p < A.S; p++) {
+    const n = A.nodes[p];
+    if (n.type !== 'match') continue;
+    const [a, b] = n.src;
+    if (a == null || b == null) continue;
+    pairs.push([a, b]);
+    used.add(a); used.add(b);
+  }
+  pairs.sort((x, y) => x[0] - y[0]);
+  const solos = [];
+  br.leaves.forEach((x, i) => { if (x && !used.has(i)) solos.push(i); });
+  const steps = pairs.map((l) => ({ l, pair: true }));
+  if (solos.length) steps.push({ l: solos, pair: false });
+  return steps;
+}
+
+// 揭曉進度 → 已經揭曉的葉子（null = 沒有在揭曉，全部公開）
+export function revealedSet(reveal) {
+  if (!reveal) return null;
+  const shown = reveal.shown || 0;
+  if (Array.isArray(reveal.steps)) {
+    const s = new Set();
+    reveal.steps.slice(0, shown).forEach((st) => (st.l || []).forEach((i) => s.add(i)));
+    return s;
+  }
+  if (Array.isArray(reveal.order)) return new Set(reveal.order.slice(0, shown)); // 舊版：一次揭曉一隊
+  return null;
+}
+
+export function revealPending(reveal) {
+  if (!reveal) return false;
+  const list = Array.isArray(reveal.steps) ? reveal.steps : reveal.order || [];
+  return (reveal.shown || 0) < list.length;
+}
+
 // 給前台用的精簡版本（隱藏還沒揭曉的隊伍）
 export function publicView(br, names, reveal) {
   if (!br) return null;
   const leaves = br.leaves.slice();
-  if (reveal && Array.isArray(reveal.order)) {
-    const shown = new Set(reveal.order.slice(0, reveal.shown || 0));
-    leaves.forEach((x, i) => { if (x && !shown.has(i)) leaves[i] = '?'; });
-  }
+  const shown = revealedSet(reveal);
+  if (shown) leaves.forEach((x, i) => { if (x && !shown.has(i)) leaves[i] = '?'; });
   const usedNames = {};
   leaves.forEach((x) => { if (isTeam(x)) usedNames[x] = names[x] || '未命名隊伍'; });
   const m = {};
@@ -382,5 +422,5 @@ export function publicView(br, names, reveal) {
     if (r.w === 0 || r.w === 1) { o.w = r.w; o.wid = r.wid; }
     if (Object.keys(o).length) m[key] = o;
   }
-  return { v: 1, k: br.k, mode: br.mode, third: !!br.third, leaves, m, names: usedNames, revealing: !!(reveal && reveal.shown < (reveal.order || []).length) };
+  return { v: 1, k: br.k, mode: br.mode, third: !!br.third, leaves, m, names: usedNames, revealing: revealPending(reveal) };
 }

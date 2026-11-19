@@ -125,6 +125,16 @@ export async function saveBanner() {
   await put(PATHS.pubBanner, S.banner);
 }
 
+// 直播抽籤：前台的看板與賽程一次寫入，前台不會先看到賽程上的名字、才看到抽籤動畫
+export async function saveDraw() {
+  await put(PATHS.bracket, S.bracket);
+  const pub = S.bracket && S.bracket.published ? str(publicView(S.bracket, teamNames(), S.bracket.reveal)) : null;
+  const banner = str(S.banner);
+  cache[PATHS.pubBracket] = pub;
+  cache[PATHS.pubBanner] = banner;
+  await S.store.update(PATHS.pub, { bracket: pub, banner });
+}
+
 export async function saveSync() {
   await S.store.set(PATHS.sync, S.sync);
 }

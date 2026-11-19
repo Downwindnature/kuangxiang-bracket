@@ -1,10 +1,11 @@
 // display.js — 前台顯示屏
 import { openStore } from './store.js';
 import { renderBracket } from './render.js';
-import { bannerView, withDefaults } from './banner.js';
+import { bannerView, withDefaults, drawTiming } from './banner.js';
 import { parseJSON, fitText, esc } from './util.js';
-import { createBracket, setResult, analyze, nextMatch, publicView, autoTimes, MODE_ODD, MODE_POW2, THIRD } from './bracket.js';
+import { createBracket, setResult, analyze, nextMatch, publicView, autoTimes, revealSteps, MODE_ODD, MODE_POW2, THIRD } from './bracket.js';
 import { startStars } from './bg.js';
+import { createDrawFx, drawMask } from './drawfx.js';
 
 const q = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -28,6 +29,8 @@ let now = () => Date.now();
 let prevRender = null;
 let lastBoardKey = '';
 let lastBannerKey = '';
+let dataKey = '';
+const fx = createDrawFx(stage, { now: () => now(), board, onFrame: () => { renderBoard(); tickBanner(); } });
 
 function liveIdOf() {
   const b = withDefaults(S.banner);
@@ -43,11 +46,14 @@ function renderBoard() {
   if (mode === 'auto' || mode === 'bracket') what = S.bracket ? 'bracket' : 'blank';
   else if (mode === 'teams') what = S.teams ? 'teams' : 'blank';
   const liveId = liveIdOf();
-  const key = JSON.stringify([what, what === 'bracket' ? S.bracket : null, what === 'teams' ? S.teams : null, st, liveId]);
+  const mask = what === 'bracket' ? drawMask(S.banner, now()) : null; // 抽籤動畫還沒播完的那一組先顯示「？」
+  const key = JSON.stringify([what, dataKey, liveId, mask]);
   if (key === lastBoardKey) return;
   lastBoardKey = key;
   if (what === 'bracket') {
-    const r = renderBracket(board, S.bracket, { settings: st, liveId, prev: prevRender, fit: { w: BOARD_W, h: BOARD_H }, maxScale: 1.35 });
+    let pub = S.bracket;
+    if (mask) pub = Object.assign({}, pub, { leaves: pub.leaves.map((x, i) => (x && mask.includes(i) ? '?' : x)) });
+    const r = renderBracket(board, pub, { settings: st, liveId, prev: prevRender, fit: { w: BOARD_W, h: BOARD_H }, maxScale: 1.35 });
     prevRender = r.prev;
   } else if (what === 'teams') {
     renderTeams(S.teams, st);
@@ -100,6 +106,12 @@ function apply(v) {
   S.bracket = parseJSON(v.bracket, null);
   S.teams = parseJSON(v.teams, null);
   if (S.settings.title) document.title = `${S.settings.title}｜賽程表`;
+  refresh();
+}
+
+function refresh() {
+  dataKey = JSON.stringify([S.bracket, S.teams, S.settings]);
+  fx.sync(S.banner);
   renderBoard();
   tickBanner();
 }
@@ -121,7 +133,7 @@ async function main() {
       showError(e);
     }
   }
-  setInterval(tickBanner, 250);
+  setInterval(() => { fx.sync(S.banner); renderBoard(); tickBanner(); }, 250);
 }
 
 function showError(e) {
@@ -162,6 +174,11 @@ function demo() {
     br = setResult(br, nx.id, w, w === 0 ? [20, lo] : [lo, 20]);
     done++;
   }
+  if (q.has('drawfx')) {
+    S.settings = { title: '狂想之息 比賽', subtitle: '第五人格｜賽程表', stage: 'auto' };
+    demoDraw(br, names, n);
+    return;
+  }
   let reveal = null;
   if (q.has('reveal')) {
     const order = br.leaves.map((x, i) => (x ? i : -1)).filter((i) => i >= 0);
@@ -187,8 +204,46 @@ function demo() {
   if (q.get('stage') === 'teams') {
     S.teams = { title: '參賽隊伍', teams: ids.slice(0, Math.min(n, 30)).map((id, i) => ({ n: names[id], m: [names[id], `隊員${i}A`, `隊員${i}B`], c: 0 })), waiting: ['小明', '阿華', 'Kiki'] };
   }
-  renderBoard();
-  tickBanner();
+  refresh();
+}
+
+// 抽籤動畫示範：index.html?demo=12&drawfx=1（自動一組一組抽）；&step=2&t=4.5 停在第 3 步的第 4.5 秒；&nofx=1 不播動畫
+function demoDraw(br, names, n) {
+  const steps = revealSteps(br);
+  const pairs = steps.filter((s) => s.pair).length;
+  const fxOn = q.get('nofx') !== '1';
+  const tumble = Number(q.get('tumble')) || undefined;
+  const hold = Number(q.get('hold')) || undefined;
+  const show = (i, offsetMs = 0) => {
+    const s = steps[i];
+    const at = Date.now() - offsetMs;
+    S.bracket = publicView(br, names, { steps, shown: i + 1 });
+    S.banner = {
+      mode: 'draw', at,
+      draw: {
+        kind: s.pair ? 'pair' : 'solo', n: steps.slice(0, i + 1).filter((x) => x.pair).length, pairs, total: n,
+        leaves: s.l, names: s.l.map((l) => names[br.leaves[l]]), fx: fxOn && s.pair, tumble, hold,
+        pool: steps.slice(i).reduce((a, x) => a + x.l.length, 0), last: i === steps.length - 1, at,
+      },
+    };
+    refresh();
+  };
+  if (q.has('t')) { show(Math.max(0, Math.min(steps.length - 1, Number(q.get('step')) || 0)), Number(q.get('t')) * 1000); return; }
+  const startView = () => {
+    S.bracket = publicView(br, names, { steps, shown: 0 });
+    S.banner = { mode: 'draw', at: Date.now(), draw: { kind: 'start', total: n, at: Date.now() } };
+    refresh();
+  };
+  let i = -1;
+  const next = () => {
+    i++;
+    if (i >= steps.length) { setTimeout(() => { i = -1; startView(); setTimeout(next, 2500); }, 8000); return; }
+    show(i);
+    const d = S.banner.draw;
+    setTimeout(next, (d.fx ? drawTiming(d).end : 0) * 1000 + 1500);
+  };
+  startView();
+  setTimeout(next, 2500);
 }
 
 main();

@@ -91,3 +91,7 @@
 .bn-custom { width: 100%; }
 .bn-cline { font-size: 46px; font-weight: 900; color: #fff; text-shadow: 0 0 14px rgba(170, 120, 255, .95); line-height: 1.2; }
 .bn-custom .bn-cline + .bn-cline { font-size: 32px; color: var(--ink-2); }
+
+/* 直播抽籤：還沒抽出來的「？」 */
+.bn-line .dq { animation: kx-dq 1s ease-in-out infinite; }
+@keyframes kx-dq { 0%, 100% { transform: scale(1); opacity: .8; } 50% { transform: scale(1.18); opacity: 1; } }
