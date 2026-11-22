@@ -93,7 +93,7 @@ export function renderBracket(el, pub, opts = {}) {
     const cls = ['mb', `side-${b.side}`, `k-${b.kind}`];
     if (n.type === 'bye') cls.push('is-bye');
     if (n.done) cls.push('done');
-    if (opts.liveId != null && String(opts.liveId) === String(n.id)) cls.push('live');
+    if (!n.done && opts.liveId != null && String(opts.liveId) === String(n.id)) cls.push('live'); // 打完的場次不再標成比賽中
     if (opts.interactive && n.type === 'match') cls.push('clickable');
     const time = showTimes && n.time && b.kind !== 'final' && b.kind !== 'third' ? `<div class="mb-time">${esc(n.time)}</div>` : '';
     html += `<div class="${cls.join(' ')}" data-node="${esc(n.id)}" style="left:${b.x}px;top:${b.y - boxH / 2}px;width:${P.boxW}px;height:${boxH}px">${time}${slot(n, 0, b.kind)}${slot(n, 1, b.kind)}</div>`;

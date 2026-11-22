@@ -364,6 +364,25 @@ export function autoTimes(br0, { start = '21:00', every = 30, sameRound = false 
   return br;
 }
 
+// 有沒有已登錄的比賽結果（勝方或比分）
+export function hasResults(br) {
+  if (!br) return false;
+  return Object.values(br.m || {}).some((x) => x && (x.w === 0 || x.w === 1 || (Array.isArray(x.s) && x.s.some((v) => v !== '' && v != null))));
+}
+
+// 清掉所有勝負與比分（保留每場的時間）
+export function clearAllResults(br0) {
+  const br = clone(br0);
+  for (const [k, x] of Object.entries(br.m || {})) {
+    if (!x) continue;
+    delete x.w;
+    delete x.wid;
+    delete x.s;
+    if (!Object.keys(x).length) delete br.m[k];
+  }
+  return br;
+}
+
 // 直播抽籤的揭曉順序：每一步抽出「會直接對戰的兩隊」（依位置：先左半邊由上到下，再右半邊），
 // 第一場就要對上勝隊的隊伍（第 1 輪輪空）沒有直接的對手，留到最後一起揭曉
 export function revealSteps(br) {

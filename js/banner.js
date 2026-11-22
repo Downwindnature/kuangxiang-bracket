@@ -50,7 +50,8 @@ export function resolveNext(b, A) {
   if (b.next === 'none') return null;
   if (b.next && b.next !== 'auto') {
     const n = getNode(A, b.next);
-    return n && n.ready && !n.done && String(n.id) !== String(b.cur) ? n : null;
+    if (n && n.type === 'match' && n.ready && !n.done && String(n.id) !== String(b.cur)) return n;
+    // 指定的下一場已經打完（或變成目前場次）：改回自動找下一場
   }
   return nextMatch(A, b.cur);
 }
@@ -88,7 +89,9 @@ export function bannerView(b0, { bracket, settings, now }) {
   const nm = (id) => (id && id !== '?' ? (names[id] || '未命名隊伍') : '待定');
   const cur = A && b.cur != null ? getNode(A, b.cur) : null;
   const nxt = resolveNext(b, A);
-  const { phase } = bannerPhase(b, now, !!nxt);
+  let { phase } = bannerPhase(b, now, !!nxt);
+  // 目前場次已經打完：不再回到「VS／正在比賽中」，改成一直顯示下一場請準備（沒有下一場就顯示結果）
+  if (b.mode === 'flow' && cur && cur.done) phase = nxt ? 'prep' : 'result';
   const title = (settings && settings.title) || '狂想之息 比賽';
   const sub = (settings && settings.subtitle) || '';
   const roundOf = (n) => (A && n ? matchTitle(A, n) : '');

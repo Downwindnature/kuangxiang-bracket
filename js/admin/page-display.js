@@ -55,13 +55,17 @@ function renderBanner(body) {
   const curOpts = ready.map((n) => `<option value="${esc(n.id)}" ${String(b.cur) === String(n.id) ? 'selected' : ''}>${esc(matchLabel(A, n, names))}</option>`).join('');
   const nextOpts = ready.filter((n) => !n.done).map((n) => `<option value="${esc(n.id)}" ${String(b.next) === String(n.id) ? 'selected' : ''}>${esc(matchLabel(A, n, names))}</option>`).join('');
   const d = b.dur, t = b.tpl;
-  const modeText = { idle: '待機', flow: '對戰流程', result: '勝負公告', custom: '自訂公告', draw: '抽籤' }[b.mode] || b.mode;
+  const modeLabel = (bb, now) => {
+    if (bb.mode === 'result' && (now - (bb.at || 0)) / 1000 >= bb.dur.result) return '下一場請準備';
+    return { idle: '待機', flow: '對戰流程', result: '勝負公告', custom: '自訂公告', draw: '抽籤' }[bb.mode] || bb.mode;
+  };
+  const modeText = modeLabel(b, S.store.now());
   const published = !!(S.bracket && S.bracket.published);
   body.innerHTML = `
     <section class="card">
-      <h3>看板預覽 <span class="tag">${esc(modeText)}</span></h3>
+      <h3>看板預覽 <span class="tag" id="bnModeTag">${esc(modeText)}</span></h3>
       <div class="pv-banner"><div class="pv-scale"><section class="banner pv"><div class="bn-inner"></div></section></div></div>
-      <p class="hint">前台最上方的固定顯示屏。對戰流程：<b>VS</b>（${d.vs} 秒）→ <b>正在比賽中</b>（${d.live} 秒）→ <b>下一場請準備</b>（${d.next} 秒）${b.loop ? '→ 循環' : ''}。</p>
+      <p class="hint">前台最上方的固定顯示屏。對戰流程：<b>VS</b>（${d.vs} 秒）→ <b>正在比賽中</b>（${d.live} 秒）→ <b>下一場請準備</b>（${d.next} 秒）${b.loop ? '→ 循環' : ''}。按「結束本場、登錄比分」後先顯示勝負公告（${d.result} 秒），接著一直顯示<b>下一場請準備</b>，直到按「開始下一場」。</p>
     </section>
     <section class="card">
       <h3>對戰流程</h3>
@@ -115,6 +119,8 @@ function renderBanner(body) {
     pvScale.style.transform = `scale(${s})`;
     pvScale.parentElement.style.height = 156 * s + 'px';
     const v = bannerView(S.banner, { bracket: pubBracket(), settings: S.settings, now: S.store.now() });
+    const tag = body.querySelector('#bnModeTag');
+    if (tag) tag.textContent = modeLabel(S.banner, S.store.now());
     if (v.key === lastKey) return;
     lastKey = v.key;
     pvBanner.className = 'banner pv ' + v.cls;
@@ -136,18 +142,30 @@ function renderBanner(body) {
   };
   $('bnCur').onchange = () => { S.banner.cur = $('bnCur').value || null; };
   $('bnNext').onchange = async () => { await setBanner({ next: $('bnNext').value }); };
+  const freshA = () => { const p = pubBracket(); return p ? analyze(p) : null; };
   $('bnStart').onclick = async () => {
     const cur = $('bnCur').value;
     if (!cur) return toast('請先選目前場次', { type: 'warn' });
+    const A2 = freshA();
+    const cn = A2 && getNode(A2, cur);
+    if (cn && cn.done) return toast('這場已經結束了，請選還沒打的場次（或按「開始下一場」）', { type: 'warn' });
     await setBanner({ mode: 'flow', cur, next: $('bnNext').value, at: S.store.now() }, '已開始：前台顯示 VS');
     renderBanner(body);
   };
   $('bnNextNow').onclick = async () => {
     if (!S.banner.cur) return toast('請先開始一場比賽', { type: 'warn' });
-    const A2 = pb ? analyze(pb) : null;
+    const A2 = freshA();
     if (!resolveNext(S.banner, A2)) return toast('目前沒有可顯示的下一場', { type: 'warn' });
     const dd = S.banner.dur;
-    await setBanner({ mode: 'flow', at: S.store.now() - (dd.vs + dd.live) * 1000 }, '前台跳出「下一場請準備」');
+    const cn = getNode(A2, S.banner.cur);
+    if (!cn || cn.done || dd.next <= 0) {
+      // 本場已經結束：一直顯示「下一場請準備」，直到按「開始下一場」
+      await setBanner({ mode: 'result', at: S.store.now() - dd.result * 1000 - 1 }, '前台顯示「下一場請準備」');
+    } else {
+      // 本場還在比：先跳出下一場請準備，之後回到正在比賽中
+      await setBanner({ mode: 'flow', at: S.store.now() - (dd.vs + dd.live) * 1000 }, '前台跳出「下一場請準備」');
+    }
+    renderBanner(body);
   };
   $('bnFinish').onclick = () => {
     const id = S.banner.cur || $('bnCur').value;
@@ -155,8 +173,7 @@ function renderBanner(body) {
     openResultDialog(id, () => renderBanner(body));
   };
   $('bnStartNext').onclick = async () => {
-    const A2 = pb ? analyze(pb) : null;
-    const nx = resolveNext(S.banner, A2);
+    const nx = resolveNext(S.banner, freshA());
     if (!nx) return toast('沒有下一場了（或兩隊還沒確定）', { type: 'warn' });
     await setBanner({ mode: 'flow', cur: nx.id, next: 'auto', at: S.store.now() }, '已開始下一場');
     renderBanner(body);
@@ -346,7 +363,7 @@ function matchRow(n, nm, live) {
   const s = n.score || ['', ''];
   const status = n.done ? '<span class="tag ok">已結束</span>' : live === String(n.id) ? '<span class="tag live">比賽中</span>' : n.ready ? '<span class="tag">可開始</span>' : '<span class="tag dim">等待前一場</span>';
   const dis = n.ready ? '' : 'disabled';
-  return `<div class="mrow ${n.done ? 'done' : ''} ${live === String(n.id) ? 'live' : ''}" data-id="${esc(n.id)}">
+  return `<div class="mrow ${n.done ? 'done' : ''} ${!n.done && live === String(n.id) ? 'live' : ''}" data-id="${esc(n.id)}">
     <input class="m-time" value="${esc(n.time)}" placeholder="時間" maxlength="5">
     <span class="m-team ${n.done && n.w === 0 ? 'win' : ''}">${esc(nm(n.ent[0]))}</span>
     <input class="m-s" value="${esc(s[0] ?? '')}" inputmode="numeric" ${dis}>

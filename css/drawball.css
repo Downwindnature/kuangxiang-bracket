@@ -1,0 +1,64 @@
+/* drawball.css — 後台全螢幕抽籤球畫面（舞台 1920×1080，等比縮放到視窗） */
+body.fs-draw { overflow: hidden; }
+body.fs-draw #app { display: none; }
+body.fs-draw .space-bg.dim { opacity: 1; }
+.dball { position: fixed; inset: 0; z-index: 50; }
+.dball [hidden] { display: none !important; } /* 按鈕本身有 display，hidden 要另外蓋掉 */
+.dball .space-bg.dball-bg { background: none; } /* 星空用後台原本那層，這裡只加地平線格線 */
+.dball-vp { position: absolute; inset: 0; overflow: hidden; }
+.dball-stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+.dball-stage .banner { left: 220px; top: 26px; width: 1480px; height: 156px; }
+
+/* 右邊：已抽出 */
+.dball-panel {
+  position: absolute;
+  left: 1390px;
+  top: 214px;
+  width: 500px;
+  height: 686px;
+  padding: 18px 18px 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(36, 18, 96, .80), rgba(14, 8, 52, .84));
+  box-shadow: 0 0 0 2px rgba(160, 130, 255, .75), 0 0 26px rgba(130, 90, 255, .45);
+  display: flex;
+  flex-direction: column;
+}
+.dball-panel h4 { margin: 0 0 12px; font-size: 26px; letter-spacing: 4px; color: #fff; display: flex; justify-content: space-between; align-items: baseline; }
+.dball-panel h4 small { font-size: 18px; letter-spacing: 1px; color: var(--ink-2); }
+.dball-list { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 9px; padding-right: 4px; }
+.dl-item {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(170, 150, 255, .28);
+  font-size: 22px;
+}
+.dl-item.solo { grid-template-columns: 72px minmax(0, 1fr); }
+.dl-n { font-size: 16px; font-weight: 800; color: var(--ink-2); white-space: nowrap; }
+.dl-t { font-weight: 900; color: #fff; text-align: center; line-height: 1.2; word-break: break-all; }
+.dl-t.a { color: #8fd8ff; }
+.dl-t.b { color: #ff9be4; }
+.dl-t.q { color: var(--ink-3); }
+.dl-t.solo-list { color: #ffe08a; white-space: normal; text-align: left; }
+.dl-vs { font-style: italic; font-weight: 900; color: #ffd27a; }
+.dl-item.flash { animation: kx-dl-flash 1.4s ease-out 1; }
+@keyframes kx-dl-flash {
+  0% { background: rgba(255, 255, 255, .85); }
+  30% { background: rgba(160, 120, 255, .55); }
+  100% { background: rgba(255, 255, 255, .06); }
+}
+.dball-empty { margin-top: 36px; text-align: center; font-size: 20px; color: var(--ink-3); }
+
+/* 抽獎球下方：抽籤按鈕、回到後台／到前台 */
+.dball-ctrl, .dball-nav { position: absolute; left: 160px; width: 1200px; display: flex; justify-content: center; align-items: center; gap: 18px; }
+.dball-ctrl { top: 916px; }
+.dball-nav { top: 1000px; }
+.dball-ctrl button, .dball-nav .btn { font-size: 24px; padding: 13px 30px; border-radius: 14px; }
+.dball-ctrl #dbNext { min-width: 420px; justify-content: center; font-size: 30px; padding: 15px 44px; box-shadow: 0 0 24px rgba(150, 110, 255, .6); }
+.dball-ctrl #dbNext:disabled { opacity: .7; cursor: default; box-shadow: none; }
+.dball-msg { position: absolute; left: 160px; width: 1200px; top: 226px; text-align: center; font-size: 30px; font-weight: 800; color: var(--ink-2); }
+.dfx.persistent .dfx-title { pointer-events: none; }

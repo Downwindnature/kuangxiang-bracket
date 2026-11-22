@@ -11,12 +11,14 @@ import * as PDisplay from './page-display.js';
 import * as PImport from './page-import.js';
 import * as PDraw from './page-draw.js';
 import * as PReset from './page-reset.js';
+import * as PBall from './page-drawball.js';
 
 const PAGES = {
   display: { title: '顯示屏設定', mod: PDisplay },
   import: { title: '表單匯入', mod: PImport },
   draw: { title: '選手抽籤', mod: PDraw },
   reset: { title: '重置', mod: PReset },
+  drawball: { title: '抽籤球畫面', mod: PBall, hidden: true }, // 全螢幕，不放在左邊選單
 };
 
 const app = document.getElementById('app');
@@ -116,12 +118,12 @@ async function enter(user) {
       <a class="brand" href="#home">🏆 狂想之息｜賽程表後台</a>
       <span class="mode ${local ? 'local' : ''}">${local ? '單機測試模式' : '線上模式'}</span>
       <span class="spacer"></span>
-      ${user ? `<span class="user">${esc(user.email || '')}</span><button id="logout" class="ghost">登出</button>` : ''}
+      ${user ? '<button id="logout" class="ghost">登出</button>' : ''}
     </header>
     ${local ? `<div class="local-bar">目前是<b>單機測試模式</b>（還沒設定 Firebase）：資料只存在這台電腦的這個瀏覽器，同一個瀏覽器開的前台分頁會同步顯示。要讓別人看到前台、或用 OBS 擷取，請照 README 設定 Firebase。${firebaseReady() ? '（網址有 ?local 參數，所以強制使用單機模式）' : ''}</div>` : ''}
     <div class="shell">
       <nav class="side" id="side">
-        ${Object.entries(PAGES).map(([k, p]) => `<a href="#${k}" data-page="${k}">${p.title}</a>`).join('')}
+        ${Object.entries(PAGES).filter(([, p]) => !p.hidden).map(([k, p]) => `<a href="#${k}" data-page="${k}">${p.title}</a>`).join('')}
         <a href="index.html" class="front">回到前台</a>
       </nav>
       <main id="main"></main>

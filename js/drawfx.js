@@ -4,14 +4,17 @@ import { drawTiming } from './banner.js';
 import { Drum, BALL_COLORS, MAX_DRUM_BALLS } from './drum.js';
 import { FONT_STACK } from './util.js';
 
-// 版面（舞台 1920×1080 座標）
-const CX = 960, CY = 668;          // 抽獎球圓心
-const R_OUT = 250, R_IN = 238;     // 外框半徑、球能滾動的內側半徑
+// 版面（舞台 1920×1080 座標）；前台的預設位置，後台抽籤球畫面會傳入自己的 geom
+const DEFAULT_GEOM = {
+  cx: 960, cy: 668,                                   // 抽獎球圓心
+  scale: 1,                                           // 抽獎球大小
+  slots: [{ x: 530, y: 640 }, { x: 1390, y: 640 }],   // 抽出來的兩顆球停留的位置（中間是 VS）
+  titleTop: 204,                                      // 「第 n 組」標題
+  backTop: 196,                                       // 暗色背景從哪裡開始（上面留給看板）
+};
+const R_OUT = 250, R_IN = 238;     // 外框半徑、球能滾動的內側半徑（抽獎球本身的座標）
 const CAN = { w: 700, h: 780, ox: 350, oy: 400 }; // 畫布大小、圓心在畫布裡的位置
 const BIG = 175;                   // 抽出來的球放大後的半徑
-const SLOT = [{ x: 530, y: 640 }, { x: 1390, y: 640 }]; // 抽出來的兩顆球停留的位置（中間是 VS）
-const OUTLET = { x: CX, y: CY - R_IN + 6 };
-const TUBE_TOP = { x: CX, y: CY - R_OUT - 72 };
 const STEP = 1 / 240;
 const LAG = 0.16;                  // 第二顆球晚一點出來
 const A_END = 0.28, B_END = 0.4, C_END = 0.94; // 出口動畫各段（秒，相對每顆球）
@@ -35,10 +38,19 @@ function intensity(t, tm) {
   return up * down;
 }
 
-export function createDrawFx(stage, { now, board, onFrame } = {}) {
+// persistent：後台抽籤球畫面用，沒有在抽的時候也顯示抽獎球（用 setIdle 設定球數）
+export function createDrawFx(stage, opts = {}) {
+  const { now, board, onFrame, persistent = false, backdrop = true } = opts;
+  const G = Object.assign({}, DEFAULT_GEOM, opts.geom || {});
+  const K = G.scale;
+  const CX = G.cx, CY = G.cy;
+  const SLOT = G.slots;
+  const VS = { x: (SLOT[0].x + SLOT[1].x) / 2, y: (SLOT[0].y + SLOT[1].y) / 2 };
+  const OUTLET = { x: CX, y: CY - (R_IN - 6) * K };
+  const TUBE_TOP = { x: CX, y: CY - (R_OUT + 72) * K };
   const root = document.createElement('div');
-  root.className = 'dfx';
-  root.hidden = true;
+  root.className = 'dfx' + (persistent ? ' persistent' : '');
+  root.hidden = !persistent;
   root.setAttribute('aria-hidden', 'true');
   const ballHtml = '<div class="dfx-ball"><div class="dfx-face"><div class="dfx-q">？</div><div class="dfx-name"></div></div></div>';
   root.innerHTML = `<div class="dfx-back"></div>
@@ -53,8 +65,24 @@ export function createDrawFx(stage, { now, board, onFrame } = {}) {
   const canvas = $('.dfx-drum'), burst = $('.dfx-burst'), vs = $('.dfx-vs');
   const balls = [...root.querySelectorAll('.dfx-ball')].map((el) => ({ el, q: el.querySelector('.dfx-q'), name: el.querySelector('.dfx-name') }));
   const ctx = canvas.getContext('2d');
+  // 依版面放好各個元素
+  canvas.style.left = `${CX - CAN.ox}px`;
+  canvas.style.top = `${CY - CAN.oy}px`;
+  burst.style.left = `${CX}px`;
+  burst.style.top = `${TUBE_TOP.y}px`;
+  vs.style.left = `${VS.x}px`;
+  vs.style.top = `${VS.y}px`;
+  title.style.top = `${G.titleTop}px`;
+  title.style.left = `${CX - 600}px`;
+  title.style.right = 'auto';
+  title.style.width = '1200px';
+  back.style.top = `${G.backTop}px`;
+  if (!backdrop) back.style.display = 'none';
   let cur = null;
   let layers = null; // 預先畫好的球體背面、正面、球的貼圖
+  let idleDrum = null; // 後台：沒有在抽的時候顯示的球
+  let idleWant = null;
+  let idlePainted = false;
 
   const stageScale = () => {
     const r = stage.getBoundingClientRect();
@@ -200,14 +228,12 @@ export function createDrawFx(stage, { now, board, onFrame } = {}) {
     layers = { k, r, back: bk, front: fr, sprites };
   }
 
-  function drawDrum(t) {
-    const { tm, drum } = cur;
+  function drawDrum(drum, I, t) {
     const k = layers.k;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(layers.back, 0, 0);
     ctx.setTransform(k, 0, 0, k, 0, 0);
-    const I = intensity(t, tm);
     if (I > 0.02) { // 底部吹氣的光
       const pulse = 0.75 + 0.25 * Math.sin(t * 18);
       const jg = ctx.createRadialGradient(CAN.ox, CAN.oy + R_IN * 0.92, 10, CAN.ox, CAN.oy + R_IN * 0.8, 190);
@@ -269,16 +295,16 @@ export function createDrawFx(stage, { now, board, onFrame } = {}) {
     const b = cur.drum.pick(1)[0];
     const lateJoin = t > cur.tm.tumble + i * LAG + 0.05 || !b;
     cur.picked[i] = {
-      from: b && !lateJoin ? { x: CX + b.x, y: CY + b.y } : { x: OUTLET.x, y: OUTLET.y },
+      from: b && !lateJoin ? { x: CX + b.x * K, y: CY + b.y * K } : { x: OUTLET.x, y: OUTLET.y },
       rot: normAngle(b ? b.a : 0) + (i ? Math.PI * 2 : -Math.PI * 2),
       color: b ? b.color : (i ? 7 : 4),
-      r: cur.drum.r,
+      r: cur.drum.r * K,
     };
     setBallStyle(i, cur.picked[i].color);
   }
 
   function slotTarget(leaf, i) {
-    const el = board && leaf != null ? board.querySelector(`.mb-row[data-leaf="${leaf}"]`) : null;
+    const el = board && leaf != null ? board.querySelector(`[data-leaf="${leaf}"]`) : null;
     if (!el) return { x: SLOT[i].x, y: SLOT[i].y, r: 0 };
     const sr = stage.getBoundingClientRect();
     const s = sr.width / 1920 || 1;
@@ -311,7 +337,7 @@ export function createDrawFx(stage, { now, board, onFrame } = {}) {
           x = OUTLET.x; y = lerp(OUTLET.y, TUBE_TOP.y, u); r = pi.r; nameOp = 0;
         } else {
           const u = (e - B_END) / (C_END - B_END);
-          const ctl = { x: CX + (i ? 330 : -330), y: TUBE_TOP.y - 40 };
+          const ctl = { x: lerp(CX, SLOT[i].x, 0.77), y: TUBE_TOP.y - 40 };
           const q = bez(TUBE_TOP, ctl, SLOT[i], easeInOut(u));
           x = q.x; y = q.y;
           const g = easeInOut(clamp01((u - 0.1) / 0.9)); // 先飛出來、後半段才放大，最後彈一下
@@ -349,7 +375,7 @@ export function createDrawFx(stage, { now, board, onFrame } = {}) {
     if (!cur) return;
     const { tm } = cur;
     const t = Math.max(0, (now() - cur.d.at) / 1000);
-    if (t >= tm.end) { stop(); if (onFrame) onFrame(); return; }
+    if (t >= tm.end) { finish(); if (onFrame) onFrame(); return; }
     const pn = performance.now();
     cur.acc += Math.min(0.05, (pn - cur.last) / 1000);
     cur.last = pn;
@@ -361,17 +387,26 @@ export function createDrawFx(stage, { now, board, onFrame } = {}) {
 
     const holdEnd = tm.revealAt - tm.fly;
     // 背景、標題
-    root.style.opacity = String(smooth(0, 0.3, t));
+    root.style.opacity = persistent ? '1' : String(smooth(0, 0.3, t));
     back.style.opacity = String(1 - smooth(holdEnd, tm.revealAt, t));
-    title.style.opacity = String(1 - smooth(holdEnd, holdEnd + 0.3, t));
+    title.style.opacity = String(Math.min(persistent ? smooth(0, 0.3, t) : 1, 1 - smooth(holdEnd, holdEnd + 0.3, t)));
     sub.style.opacity = String(1 - smooth(tm.tumble - 0.1, tm.tumble + 0.2, t));
-    // 抽獎球
+    // 抽獎球：抽出來的球放大時先淡出，後台抽籤球畫面在球飛走時再淡入
     const exitFade = smooth(tm.tumble + 0.3, tm.tumble + tm.exit, t);
+    let op = 0, sc = 0.88;
     if (exitFade < 1) {
-      const intro = easeOutBack(clamp01(t / 0.45));
-      canvas.style.opacity = String(clamp01(t / 0.25) * (1 - exitFade));
-      canvas.style.transform = `scale(${(lerp(0.55, 1, Math.min(1.05, intro)) * (1 - 0.12 * exitFade)).toFixed(4)})`;
-      drawDrum(t);
+      const intro = persistent ? 1 : easeOutBack(clamp01(t / 0.45));
+      op = (persistent ? 1 : clamp01(t / 0.25)) * (1 - exitFade);
+      sc = lerp(0.55, 1, Math.min(1.05, intro)) * (1 - 0.12 * exitFade);
+    } else if (persistent) {
+      const back2 = smooth(holdEnd, tm.revealAt, t);
+      op = back2;
+      sc = lerp(0.88, 1, back2);
+    }
+    if (op > 0.001) {
+      canvas.style.opacity = String(op);
+      canvas.style.transform = `scale(${(sc * K).toFixed(4)})`;
+      drawDrum(cur.drum, I, t);
     } else if (canvas.style.opacity !== '0') {
       canvas.style.opacity = '0';
     }
@@ -380,7 +415,7 @@ export function createDrawFx(stage, { now, board, onFrame } = {}) {
     const fl = (e) => (e > B_END - 0.06 && e < B_END + 0.32 ? Math.sin(Math.PI * clamp01((e - (B_END - 0.06)) / 0.38)) : 0);
     const bf = Math.max(fl(e0), fl(e1));
     burst.style.opacity = String(bf);
-    burst.style.transform = `translate(-50%, -50%) scale(${(0.4 + bf * 1.1).toFixed(3)})`;
+    burst.style.transform = `translate(-50%, -50%) scale(${((0.4 + bf * 1.1) * K).toFixed(3)})`;
     // VS
     const vsIn = clamp01((t - (tm.tumble + tm.exit - 0.2)) / 0.4);
     const vsOut = smooth(holdEnd, holdEnd + 0.3, t);
@@ -392,15 +427,43 @@ export function createDrawFx(stage, { now, board, onFrame } = {}) {
     cur.raf = requestAnimationFrame(frame);
   }
 
+  const liveCount = (drum) => (drum ? drum.balls.filter((b) => !b.out).length : -1);
+  function settledDrum(n) {
+    const d = new Drum({ R: R_IN, count: n, settled: true });
+    for (let i = 0; i < 360; i++) d.step(STEP, 0);
+    return d;
+  }
+
+  // 後台：沒有在抽的時候，畫一張靜止的抽獎球（球都停在底部）
+  function paintIdle() {
+    if (!persistent || cur) return;
+    const n = idleWant == null ? Math.max(0, liveCount(idleDrum)) : idleWant;
+    if (liveCount(idleDrum) !== n) idleDrum = settledDrum(n);
+    if (!layers || layers.r !== idleDrum.r || Math.abs(layers.k - stageScale() * (window.devicePixelRatio || 1)) > 0.05) buildLayers(idleDrum.r);
+    root.hidden = false;
+    root.style.opacity = '1';
+    for (const el of [title, vs, burst]) el.style.opacity = '0';
+    balls.forEach((B) => { B.el.style.opacity = '0'; });
+    canvas.style.opacity = '1';
+    canvas.style.transform = `scale(${K})`;
+    drawDrum(idleDrum, 0, 0);
+    idlePainted = true;
+  }
+
   function start(d, t, id) {
     if (cur) stop();
     const tm = drawTiming(d);
     const pool = Math.max(2, Math.min(MAX_DRUM_BALLS, Math.round(Number(d.pool)) || 12));
-    const drum = new Drum({ R: R_IN, count: pool, settled: t < 0.3 });
-    if (t >= 0.3 && t < tm.tumble) { // 中途打開：先讓球亂飛一下
-      for (let i = 0; i < 240; i++) drum.step(STEP, 1);
+    let drum;
+    if (persistent && t < 0.3 && liveCount(idleDrum) === pool) drum = idleDrum; // 接著畫面上那些球開始滾
+    else {
+      drum = new Drum({ R: R_IN, count: pool, settled: t < 0.3 });
+      if (t >= 0.3 && t < tm.tumble) { // 中途打開：先讓球亂飛一下
+        for (let i = 0; i < 240; i++) drum.step(STEP, 1);
+      }
     }
     cur = { id, d, tm, drum, picked: [null, null], targets: null, acc: 0, last: performance.now(), raf: 0 };
+    idlePainted = false;
     if (!layers || layers.r !== drum.r || Math.abs(layers.k - stageScale() * (window.devicePixelRatio || 1)) > 0.05) buildLayers(drum.r);
     titleN.textContent = `第 ${d.n || ''} 組`;
     const names = d.names || [];
@@ -409,16 +472,26 @@ export function createDrawFx(stage, { now, board, onFrame } = {}) {
       B.el.style.opacity = '0';
     });
     root.hidden = false;
-    root.style.opacity = '0';
+    root.style.opacity = persistent ? '1' : '0';
     balls.forEach((B) => fitName(B.name));
     frame();
   }
 
+  // 動畫播完
+  function finish() {
+    if (!cur) return;
+    cancelAnimationFrame(cur.raf);
+    const drum = cur.drum;
+    cur = null;
+    if (persistent) { idleDrum = drum; paintIdle(); } else root.hidden = true;
+  }
+
+  // 中途停止（看板換成別的內容）
   function stop() {
     if (!cur) return;
     cancelAnimationFrame(cur.raf);
     cur = null;
-    root.hidden = true;
+    if (persistent) paintIdle(); else root.hidden = true;
   }
 
   return {
@@ -432,8 +505,28 @@ export function createDrawFx(stage, { now, board, onFrame } = {}) {
       if (cur && cur.id === id) return;
       start(d, Math.max(0, t), id);
     },
+    // 後台：抽獎球裡要顯示幾顆球（還沒抽出的隊伍數）
+    setIdle(pool) {
+      if (!persistent) return;
+      const n = Math.max(0, Math.min(MAX_DRUM_BALLS, Math.round(Number(pool) || 0)));
+      if (n === idleWant && idlePainted) return;
+      idleWant = n;
+      if (!cur) paintIdle();
+    },
+    // 視窗大小改變：重畫（畫布解析度跟著變）
+    repaint() {
+      if (cur) { buildLayers(cur.drum.r); return; }
+      layers = null;
+      idlePainted = false;
+      paintIdle();
+    },
     active: () => !!cur,
     stop,
+    destroy() {
+      if (cur) cancelAnimationFrame(cur.raf);
+      cur = null;
+      root.remove();
+    },
   };
 }
 
