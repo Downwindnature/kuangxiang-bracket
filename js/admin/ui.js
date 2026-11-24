@@ -1,5 +1,5 @@
 // admin/ui.js — 對話框、提示訊息
-import { esc } from '../util.js';
+import { esc } from '../util.js?v=c2f13502';
 
 export function toast(msg, { type = 'ok', ms = 3600, action = null } = {}) {
   const root = document.getElementById('toasts');
@@ -13,6 +13,7 @@ export function toast(msg, { type = 'ok', ms = 3600, action = null } = {}) {
     el.appendChild(b);
   }
   root.appendChild(el);
+  while (root.children.length > 3) root.firstChild.remove(); // 最多同時顯示 3 則，舊的先收掉
   setTimeout(() => el.classList.add('out'), ms);
   setTimeout(() => el.remove(), ms + 400);
   return el;
@@ -86,4 +87,9 @@ export function busy(btn, on, text) {
   if (!btn) return;
   if (on) { btn.dataset.t = btn.textContent; btn.disabled = true; if (text) btn.textContent = text; }
   else { btn.disabled = false; if (btn.dataset.t) btn.textContent = btn.dataset.t; }
+}
+
+// 每頁的標題列：標題＋「？ 這頁怎麼用」（只看這一頁的使用教學）
+export function pageHead(title, chapter) {
+  return `<div class="page-head"><h2 class="page-title">${esc(title)}</h2>${chapter ? `<button type="button" class="help-chip" data-tour="${esc(chapter)}" title="只看這一頁的使用教學">？ 這頁怎麼用</button>` : ''}</div>`;
 }

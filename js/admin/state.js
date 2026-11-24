@@ -1,10 +1,10 @@
 // admin/state.js — 後台的資料狀態、存檔、發布到前台、還原紀錄
-import { PATHS } from '../store.js';
-import { parseJSON } from '../util.js';
-import { publicView, teamCount, clone } from '../bracket.js';
-import { regMap, teamLabel, memberInfo } from '../matcher.js';
-import { checkRegs } from '../importer.js';
-import { withDefaults } from '../banner.js';
+import { PATHS } from '../store.js?v=c2f13502';
+import { parseJSON } from '../util.js?v=c2f13502';
+import { publicView, teamCount, clone } from '../bracket.js?v=c2f13502';
+import { regMap, teamLabel, memberInfo } from '../matcher.js?v=c2f13502';
+import { checkRegs } from '../importer.js?v=c2f13502';
+import { withDefaults } from '../banner.js?v=c2f13502';
 
 export const SETTINGS_DEFAULTS = {
   title: '',          // 賽事標題：預設留空（前台看板待機時就是空白）

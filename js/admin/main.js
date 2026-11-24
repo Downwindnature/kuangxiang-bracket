@@ -1,23 +1,24 @@
 // admin/main.js — 後台入口：Firebase 登入 → 選單（顯示屏設定／表單匯入／選手抽籤／重置／回到前台）
-import { openStore, firebaseReady } from '../store.js';
-import { DB_ROOT } from '../firebase-config.js';
-import { startStars } from '../bg.js';
-import { S, loadAll, watchRemote, onChange } from './state.js';
-import { regStats } from '../importer.js';
-import { teamCount } from '../bracket.js';
-import { esc } from '../util.js';
-import { toast } from './ui.js';
-import * as PDisplay from './page-display.js';
-import * as PImport from './page-import.js';
-import * as PDraw from './page-draw.js';
-import * as PReset from './page-reset.js';
-import * as PBall from './page-drawball.js';
+import { openStore, firebaseReady } from '../store.js?v=c2f13502';
+import { DB_ROOT } from '../firebase-config.js?v=c2f13502';
+import { startStars } from '../bg.js?v=c2f13502';
+import { S, loadAll, watchRemote, onChange } from './state.js?v=c2f13502';
+import { regStats } from '../importer.js?v=c2f13502';
+import { teamCount, analyze, allMatches } from '../bracket.js?v=c2f13502';
+import { esc } from '../util.js?v=c2f13502';
+import { toast } from './ui.js?v=c2f13502';
+import * as PDisplay from './page-display.js?v=c2f13502';
+import * as PImport from './page-import.js?v=c2f13502';
+import * as PDraw from './page-draw.js?v=c2f13502';
+import * as PReset from './page-reset.js?v=c2f13502';
+import * as PBall from './page-drawball.js?v=c2f13502';
+import { startTour, startChapter, maybeAutoStart } from './tour.js?v=c2f13502';
 
 const PAGES = {
-  display: { title: '顯示屏設定', mod: PDisplay },
-  import: { title: '表單匯入', mod: PImport },
-  draw: { title: '選手抽籤', mod: PDraw },
-  reset: { title: '重置', mod: PReset },
+  display: { title: '顯示屏設定', mod: PDisplay, icon: '🖥️', sub: '看板・比分・外觀' },
+  import: { title: '表單匯入', mod: PImport, icon: '📋', sub: '報名資料' },
+  draw: { title: '選手抽籤', mod: PDraw, icon: '🎲', sub: '組隊・抽籤・公布' },
+  reset: { title: '重置', mod: PReset, icon: '♻️', sub: '清空・還原' },
   drawball: { title: '抽籤球畫面', mod: PBall, hidden: true }, // 全螢幕，不放在左邊選單
 };
 
@@ -120,22 +121,65 @@ async function enter(user) {
       <span class="spacer"></span>
       ${user ? '<button id="logout" class="ghost">登出</button>' : ''}
     </header>
-    ${local ? `<div class="local-bar">目前是<b>單機測試模式</b>（還沒設定 Firebase）：資料只存在這台電腦的這個瀏覽器，同一個瀏覽器開的前台分頁會同步顯示。要讓別人看到前台、或用 OBS 擷取，請照 README 設定 Firebase。${firebaseReady() ? '（網址有 ?local 參數，所以強制使用單機模式）' : ''}</div>` : ''}
+    ${local ? `<div class="local-bar"><b>單機測試模式</b>：資料只存在這個瀏覽器（同一個瀏覽器開的前台會同步顯示）。要讓別人看到前台或用 OBS 擷取，請照 README 設定 Firebase。${firebaseReady() ? '（網址有 ?local，所以強制使用單機模式）' : ''}</div>` : ''}
     <div class="shell">
       <nav class="side" id="side">
-        ${Object.entries(PAGES).filter(([, p]) => !p.hidden).map(([k, p]) => `<a href="#${k}" data-page="${k}">${p.title}</a>`).join('')}
+        <div class="nav-main">
+          ${Object.entries(PAGES).filter(([, p]) => !p.hidden).map(([k, p]) => `<a href="#${k}" data-page="${k}"><span class="nv-ic" aria-hidden="true">${p.icon}</span><span class="nv-tx"><b>${p.title}</b><small data-nv="${k}">${p.sub}</small></span></a>`).join('')}
+        </div>
+        <button type="button" class="nav-help" id="tourBtn"><span class="nv-ic" aria-hidden="true">📖</span><span class="nv-tx"><b>使用教學</b><small>一步一步帶你看</small></span></button>
         <a href="index.html" class="front">回到前台</a>
       </nav>
       <main id="main"></main>
     </div>`;
   const lo = document.getElementById('logout');
   if (lo) lo.onclick = () => S.store.auth.signOut();
+  document.getElementById('tourBtn').onclick = () => startTour(0);
+  // 每頁標題旁的「？ 這頁怎麼用」、首頁的進度（點了跳到對應的地方）
+  document.getElementById('main').addEventListener('click', (e) => {
+    const h = e.target.closest('[data-tour]');
+    if (h) { startChapter(h.dataset.tour); return; }
+    const g = e.target.closest('[data-sec]');
+    if (g) S.ui.scrollTo = g.dataset.sec || null;
+  });
   if (!entered) {
     entered = true;
     window.addEventListener('hashchange', route);
     onChange(onRemote);
+    onChange(() => updateNav());
+    setInterval(updateNav, 1500);
   }
   route();
+}
+
+// 左邊選單下面的小字：目前進度
+function navStatus(k) {
+  if (k === 'import') {
+    if (!S.regs.length) return { t: '還沒有報名資料' };
+    const st = regStats(S.regs);
+    return st.flagged ? { t: `${st.total} 筆・${st.flagged} 筆需確認`, cls: 'warn' } : { t: `${st.total} 筆報名`, cls: 'ok' };
+  }
+  if (k === 'draw') {
+    const br = S.bracket;
+    if (br && br.reveal) return { t: '直播抽籤中', cls: 'live' };
+    if (br && br.published) return { t: `已公布・${teamCount(br)} 隊`, cls: 'ok' };
+    if (br) return { t: '已抽籤・還沒公布', cls: 'warn' };
+    const inc = S.teams.filter((t) => t.include).length;
+    return { t: inc ? `已組成 ${inc} 隊` : '還沒組隊' };
+  }
+  if (k === 'display') {
+    const m = { flow: ['比賽進行中', 'live'], result: ['比賽進行中', 'live'], custom: ['自訂公告中', 'warn'], draw: ['抽籤畫面', 'live'] }[(S.banner || {}).mode];
+    return m ? { t: m[0], cls: m[1] } : { t: '看板待機中' };
+  }
+  return { t: (PAGES[k] && PAGES[k].sub) || '' };
+}
+function updateNav() {
+  document.querySelectorAll('#side [data-nv]').forEach((el) => {
+    const { t, cls = '' } = navStatus(el.dataset.nv);
+    if (el.textContent !== t) el.textContent = t;
+    const c = `nv-st ${cls}`.trim();
+    if (el.className !== c) el.className = c;
+  });
 }
 
 let entered = false;
@@ -158,23 +202,24 @@ function route(opt) {
   document.querySelectorAll('#side a[data-page]').forEach((a) => a.classList.toggle('on', a.dataset.page === key));
   const page = PAGES[key];
   current = page || null;
-  if (!page) { renderHome(main); return; }
+  if (!page) { renderHome(main); updateNav(); window.scrollTo(0, 0); setTimeout(maybeAutoStart, 300); return; }
   document.title = `${page.title}｜狂想之息後台`;
   page.mod.render(main);
+  updateNav();
+  setTimeout(maybeAutoStart, 300); // 第一次進後台：自動開始使用教學
   // 指定要停在哪一區（例如從抽籤球畫面回來 → ③ 公布到顯示屏）
   const target = S.ui.scrollTo && main.querySelector('#' + S.ui.scrollTo);
   S.ui.scrollTo = null;
   if (target) {
     const top = document.querySelector('.top');
-    const off = (top ? top.offsetHeight : 0) + 12;
+    const jump = main.querySelector('.jump'); // 選手抽籤頁上方固定的 ①②③
+    const off = (top ? top.offsetHeight : 0) + (jump ? jump.offsetHeight : 0) + 12;
     window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY - off));
   } else window.scrollTo(0, keep ? y : 0);
 }
 
 function renderHome(main) {
   document.title = '狂想之息｜賽程表後台';
-  const st = regStats(S.regs);
-  const inc = S.teams.filter((t) => t.include).length;
   main.innerHTML = `
     <div class="home">
       <div class="home-col">
@@ -193,9 +238,36 @@ function renderHome(main) {
         <p><b>重置</b>　清空所有選手資料，前台的選手資料也會一起消失；誤按的話可以按「返回」復原。</p>
       </div>
     </div>
-    <div class="home-stats">
-      <span>報名 <b>${st.total}</b> 筆</span><span>選手 <b>${st.players}</b> 人</span><span>隊伍 <b>${S.teams.length ? inc : 0}</b> 隊</span>
-      <span>賽程 <b>${S.bracket ? teamCount(S.bracket) : 0}</b> 隊${S.bracket ? (S.bracket.published ? '（已公布）' : '（未公布）') : ''}</span>
+    ${homeSteps()}`;
+}
+
+// 首頁下方：整體進度（還沒完成的第一步標示「下一步」，點了直接帶過去）
+function homeSteps() {
+  const st = regStats(S.regs);
+  const inc = S.teams.filter((t) => t.include).length;
+  const br = S.bracket;
+  const live = !!(br && br.reveal);
+  const pub = !!(br && br.published && !live);
+  let mt = null;
+  if (pub) {
+    const ms = allMatches(analyze(br));
+    mt = { done: ms.filter((n) => n.done).length, total: ms.length };
+  }
+  const steps = [
+    { href: '#import', title: '匯入報名', done: st.total > 0, info: st.total ? `${st.total} 筆${st.flagged ? `・${st.flagged} 筆需確認` : ''}` : '還沒有報名資料', warn: st.flagged > 0 },
+    { href: '#draw', sec: 's1', title: '組隊媒合', done: inc > 0, info: inc ? `${inc} 隊` : '還沒組隊' },
+    { href: '#draw', sec: 's2', title: '賽程抽籤', done: !!br, info: br ? `${teamCount(br)} 隊` : '還沒抽籤' },
+    { href: '#draw', sec: 's3', title: '公布賽程', done: pub, info: live ? '直播抽籤中' : pub ? '已公布' : '還沒公布' },
+    { href: '#display', title: '比賽', done: !!(mt && mt.total && mt.done === mt.total), info: mt ? (mt.done === mt.total ? '全部打完 🏆' : `已打完 ${mt.done} / ${mt.total} 場`) : '公布賽程後開始' },
+  ];
+  const nx = steps.findIndex((x) => !x.done);
+  return `
+    <div class="home-steps" aria-label="比賽進度">
+      ${steps.map((x, i) => `<a class="hs ${x.done ? 'done' : ''} ${i === nx ? 'next' : ''} ${x.warn ? 'warn' : ''}" href="${x.href}" data-sec="${x.sec || ''}">
+        <span class="hs-n">${x.done ? '✓' : i + 1}</span>
+        <span class="hs-t"><b>${x.title}</b><small>${esc(x.info)}</small></span>
+        ${i === nx ? '<em>下一步</em>' : ''}
+      </a>`).join('<span class="hs-line" aria-hidden="true"></span>')}
     </div>`;
 }
 

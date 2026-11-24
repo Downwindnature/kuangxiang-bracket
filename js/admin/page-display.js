@@ -1,12 +1,12 @@
 // admin/page-display.js — 顯示屏設定：通知看板、賽程與比分、顯示內容與外觀
-import { S, saveBanner, saveSettings, saveBracket, emit, teamNames, publicTeamsPayload } from './state.js';
-import { analyze, allMatches, matchTitle, roundNames, setResult, clearResult, setScores, setTime, autoTimes, getNode, playOrder, publicView, teamCount } from '../bracket.js';
-import { withDefaults, resolveNext, liveText, extraLines, BANNER_DEFAULTS } from '../banner.js';
-import { createBannerUI } from '../bannerui.js';
-import { renderBracket } from '../render.js';
-import { regStats } from '../importer.js';
-import { esc } from '../util.js';
-import { toast, modal, confirmDlg } from './ui.js';
+import { S, saveBanner, saveSettings, saveBracket, emit, teamNames, publicTeamsPayload } from './state.js?v=c2f13502';
+import { analyze, allMatches, matchTitle, roundNames, setResult, clearResult, setScores, setTime, autoTimes, getNode, playOrder, publicView, teamCount } from '../bracket.js?v=c2f13502';
+import { withDefaults, resolveNext, liveText, extraLines, BANNER_DEFAULTS } from '../banner.js?v=c2f13502';
+import { createBannerUI } from '../bannerui.js?v=c2f13502';
+import { renderBracket } from '../render.js?v=c2f13502';
+import { regStats } from '../importer.js?v=c2f13502';
+import { esc } from '../util.js?v=c2f13502';
+import { toast, modal, confirmDlg, pageHead } from './ui.js?v=c2f13502';
 
 let timer = null;
 let pvUI = null; // 看板預覽
@@ -31,13 +31,13 @@ export function render(main) {
   cleanup();
   const tab = S.ui.displayTab || 'banner';
   main.innerHTML = `
-    <h2 class="page-title">顯示屏設定</h2>
+    ${pageHead('顯示屏設定', 'display')}
     <p class="lead">前台顯示屏直接讀取「表單匯入」與「選手抽籤」的資料；這裡設定看板通知、比分與各種顯示細節，改完立即同步到前台。</p>
     <div class="tabs">
       <button data-tab="banner" class="${tab === 'banner' ? 'on' : ''}">通知看板</button>
       <button data-tab="matches" class="${tab === 'matches' ? 'on' : ''}">賽程與比分</button>
       <button data-tab="look" class="${tab === 'look' ? 'on' : ''}">顯示內容與外觀</button>
-      <a class="btn ghost right" href="index.html" target="_blank" rel="noopener">開啟前台顯示屏 ↗</a>
+      <a class="btn ghost right" id="openFront" href="index.html" target="_blank" rel="noopener">開啟前台顯示屏 ↗</a>
     </div>
     <div id="tabBody"></div>`;
   main.querySelector('.tabs').addEventListener('click', (e) => {
@@ -75,9 +75,9 @@ function renderBanner(body) {
   const ex = (tk) => esc(liveText(tk, nowMs));
   const xCount = extraLines(Object.assign({}, b, { extraOn: true })).length;
   body.innerHTML = `
-    <section class="card">
+    <section class="card" id="bnPreview">
       <h3>看板預覽 <span class="tag" id="bnModeTag">${esc(modeText)}</span></h3>
-      <div class="pv-banner"><div class="pv-scale"><section class="banner pv"><div class="bn-inner"></div></section></div></div>
+      <div class="pv-banner"><div class="pv-scale"><section class="banner pv"><div class="bn-inner"></div></section></div><p class="pv-empty" hidden>前台看板目前是空白（賽事標題、待機文字都沒有填）</p></div>
       <div class="opt-row">
         <span>看板樣式</span>
         <label class="chk"><input type="radio" name="bnLook" value="board" ${marquee ? '' : 'checked'}> 一般（內容依時間輪流切換）</label>
@@ -92,7 +92,7 @@ function renderBanner(body) {
     ? '<p class="hint">跑馬燈：<b>正在比賽中</b>的對戰、<b>下一場請準備</b>與額外句子排成一列輪流捲動（不受下面的秒數影響）。按「開始這場」「結束本場、登錄比分」、發布公告或抽出新的一組時，會立刻換成新的內容。</p>'
     : `<p class="hint">前台最上方的固定顯示屏。對戰流程：<b>VS</b>（${d.vs} 秒）→ <b>正在比賽中</b>（${d.live} 秒）→ <b>下一場請準備</b>（${d.next} 秒）${b.loop ? '→ 循環' : ''}。按「結束本場、登錄比分」後先顯示勝負公告（${d.result} 秒），接著一直顯示<b>下一場請準備</b>，直到按「開始下一場」。</p>`}
     </section>
-    <section class="card">
+    <section class="card" id="bnFlow">
       <h3>對戰流程</h3>
       ${!published ? '<p class="warn-box">賽程還沒公布到前台。先到「選手抽籤」抽籤並公布，這裡才有場次可以選。</p>' : ''}
       <div class="form-grid">
@@ -107,12 +107,12 @@ function renderBanner(body) {
         <button id="bnIdle" class="ghost">⏸ 回到待機</button>
       </div>
     </section>
-    <section class="card">
+    <section class="card" id="bnCustomCard">
       <h3>自訂公告</h3>
       <textarea id="bnCustom" rows="3" placeholder="例如：比賽即將開始&#10;請各隊長確認隊員到齊（最多 3 行，第 1 行最大）">${esc(b.custom || '')}</textarea>
       <div class="btns"><button id="bnCustomGo" class="primary">📢 發布公告</button><button id="bnCustomOff" class="ghost">取消公告</button></div>
     </section>
-    <section class="card">
+    <section class="card" id="bnExtra">
       <h3>額外顯示句子 <span class="tag ${b.extraOn !== false && xCount ? 'ok' : ''}">${b.extraOn === false ? '已關閉' : xCount ? `${xCount} 句` : '沒有設定'}</span></h3>
       <label class="chk"><input type="checkbox" id="xOn" ${b.extraOn !== false ? 'checked' : ''}> 在看板上顯示額外句子</label>
       <textarea id="xText" rows="3" placeholder="一行一句，最多 10 句。例如：&#10;${esc(CLOCK_LINE)}&#10;請各隊隊長在比賽開始前 10 分鐘進入自訂房">${esc(b.extra || '')}</textarea>
@@ -123,8 +123,8 @@ function renderBanner(body) {
       <p class="hint">即時代碼（會一直更新）：<code>{日期}</code> → ${ex('{日期}')}、<code>{星期}</code> → ${ex('{星期}')}、<code>{時間}</code> → ${ex('{時間}')}；也可以分開用 <code>{年}</code> <code>{月}</code> <code>{日}</code> <code>{時}</code> <code>{分}</code> <code>{秒}</code>，<code>{T}</code> = 賽事標題。<br>一般樣式：顯示在看板右下角，有好幾句時輪流換；待機又沒有賽事標題時改顯示在正中間。跑馬燈：接在比賽訊息後面一起捲動。</p>
       <div class="btns"><button id="xSave" class="primary">儲存並套用到前台</button><button id="xClear" class="ghost">清空</button></div>
     </section>
-    <section class="card">
-      <h3>顯示時間與文字</h3>
+    <details class="card fold" id="bnTiming" ${S.ui.bnTimingOpen ? 'open' : ''}>
+      <summary><h3>顯示時間與文字 <span class="hint">VS ${d.vs} 秒・比賽中 ${d.live} 秒・下一場 ${d.next} 秒・勝負公告 ${d.result} 秒</span></h3></summary>
       <div class="form-grid four">
         <label>VS 畫面（秒）<input type="number" min="0" max="120" id="dVs" value="${d.vs}"></label>
         <label>正在比賽中（秒）<input type="number" min="1" max="600" id="dLive" value="${d.live}"></label>
@@ -143,7 +143,7 @@ function renderBanner(body) {
       </div>
       <p class="hint">{A}、{B} = 兩隊名稱，{W} = 勝隊，{R} = 輪次，{T} = 賽事標題。文字裡的「VS」會自動加上特效。</p>
       <div class="btns"><button id="bnSave" class="primary">儲存</button><button id="bnDefault" class="ghost">恢復預設文字</button></div>
-    </section>`;
+    </details>`;
 
   const $ = (id) => body.querySelector('#' + id);
   const pvBanner = body.querySelector('.banner.pv');
@@ -159,7 +159,11 @@ function renderBanner(body) {
     const tag = body.querySelector('#bnModeTag');
     if (tag) tag.textContent = modeLabel(S.banner, S.store.now());
     ui.update({ banner: S.banner, bracket: pubBracket(), settings: S.settings });
+    const empty = pvBanner.classList.contains('is-blank');
+    const hint = body.querySelector('.pv-empty');
+    if (hint && hint.hidden === empty) hint.hidden = !empty;
   };
+  body.querySelector('#bnTiming').addEventListener('toggle', (e) => { S.ui.bnTimingOpen = e.target.open; });
   tick();
   timer = setInterval(tick, 250);
 
@@ -355,7 +359,7 @@ function renderMatches(body) {
         <button id="atGo">套用到全部場次</button>
       </div>
     </section>
-    <section class="card matches">${groups.join('')}</section>`;
+    <section class="card matches" id="mList">${groups.join('')}</section>`;
   const pv = body.querySelector('#pvb');
   const draw = () => {
     const w = pv.clientWidth;
@@ -452,14 +456,14 @@ function renderLook(body) {
   const ck = (k) => (st[k] !== false ? 'checked' : '');
   const radio = (name, val, label) => `<label class="chk"><input type="radio" name="${name}" value="${val}" ${st[name] === val ? 'checked' : ''}> ${label}</label>`;
   body.innerHTML = `
-    <section class="card">
+    <section class="card" id="lkStage">
       <h3>前台顯示內容</h3>
       ${radio('stage', 'auto', '自動：有公布賽程就顯示賽程表，沒有就空白（預設）')}
       ${radio('stage', 'blank', '空白（只留背景與看板）')}
       ${radio('stage', 'teams', '參賽名單（表單匯入／組隊媒合的隊伍）')}
       ${radio('stage', 'bracket', '賽程表')}
     </section>
-    <section class="card">
+    <section class="card" id="lkData">
       <h3>表單資料</h3>
       <div class="stats">
         <div class="stat"><b>${rs.total}</b><span>報名筆數</span></div>
@@ -469,7 +473,7 @@ function renderLook(body) {
       </div>
       <div class="btns"><button id="pushTeams">把參賽名單顯示到前台</button><a class="btn ghost" href="#import">前往表單匯入</a><a class="btn ghost" href="#draw">前往選手抽籤</a></div>
     </section>
-    <section class="card">
+    <section class="card" id="lkText">
       <h3>文字與樣式</h3>
       <div class="form-grid two">
         <label>賽事標題（待機時顯示；留空 = 前台看板空白）<input id="sTitle" value="${esc(st.title)}" placeholder="例如：狂想之息 比賽"></label>

@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>狂想之息｜賽程表</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%8F%86%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/bracket.css">
-  <link rel="stylesheet" href="css/banner.css">
-  <link rel="stylesheet" href="css/display.css">
-  <link rel="stylesheet" href="css/drawfx.css">
+  <link rel="stylesheet" href="css/base.css?v=c2f13502">
+  <link rel="stylesheet" href="css/bracket.css?v=c2f13502">
+  <link rel="stylesheet" href="css/banner.css?v=c2f13502">
+  <link rel="stylesheet" href="css/display.css?v=c2f13502">
+  <link rel="stylesheet" href="css/drawfx.css?v=c2f13502">
   <script>
     if (location.protocol === 'file:') {
       document.addEventListener('DOMContentLoaded', function () {
@@ -19,6 +19,42 @@
         document.body.appendChild(d);
       });
     }
+  </script>
+  <script>
+    // 網站剛更新時，瀏覽器可能還留著舊檔而載入失敗：自動換新網址重新整理一次，還是不行就顯示說明
+    (function () {
+      var KEY = 'kxb-reload-at';
+      try {
+        var u0 = new URL(location.href);
+        if (u0.searchParams.has('_r')) { u0.searchParams.delete('_r'); history.replaceState(null, '', u0.pathname + u0.search + u0.hash); }
+      } catch (e) {}
+      var shown = false;
+      function show() {
+        if (shown) return;
+        shown = true;
+        var d = document.createElement('div');
+        d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(11,6,36,.94);color:#fff;font:18px/1.8 "Microsoft JhengHei",sans-serif;text-align:center';
+        d.innerHTML = '網頁載入失敗（通常是網站剛更新，瀏覽器還留著舊檔案）。<br>請按 <b>Ctrl + F5</b> 強制重新整理；OBS 請在瀏覽器來源按「重新整理目前頁面的快取」。<br><button style="margin-top:14px;padding:8px 22px;font:inherit;border-radius:10px;border:0;cursor:pointer">重新整理</button>';
+        d.querySelector('button').onclick = function () { reload(true); };
+        (document.body || document.documentElement).appendChild(d);
+      }
+      function reload(force) {
+        try {
+          var last = Number(sessionStorage.getItem(KEY) || 0);
+          if (!force && Date.now() - last < 30000) { show(); return; }
+          sessionStorage.setItem(KEY, String(Date.now()));
+        } catch (e) { if (!force) { show(); return; } }
+        var u = new URL(location.href);
+        u.searchParams.set('_r', Date.now().toString(36));
+        location.replace(u.toString());
+      }
+      window.addEventListener('error', function (e) {
+        var t = e && e.target;
+        var m = String((e && e.message) || '');
+        var badScript = t && t.tagName === 'SCRIPT' && /\/js\//.test(t.src || '');
+        if (badScript || /does not provide an export|import not found|Importing binding name|Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed/i.test(m)) reload(false);
+      }, true);
+    })();
   </script>
 </head>
 <body class="display">
@@ -35,6 +71,6 @@
       <div id="offline" class="offline-dot" hidden>連線中斷，重新連線中…</div>
     </div>
   </div>
-  <script type="module" src="js/display.js"></script>
+  <script type="module" src="js/display.js?v=c2f13502"></script>
 </body>
 </html>

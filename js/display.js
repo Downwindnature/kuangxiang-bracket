@@ -1,12 +1,12 @@
 // display.js — 前台顯示屏
-import { openStore } from './store.js';
-import { renderBracket } from './render.js';
-import { withDefaults, drawTiming } from './banner.js';
-import { createBannerUI } from './bannerui.js';
-import { parseJSON, esc } from './util.js';
-import { createBracket, setResult, analyze, nextMatch, publicView, autoTimes, revealSteps, MODE_ODD, MODE_POW2, THIRD } from './bracket.js';
-import { startStars } from './bg.js';
-import { createDrawFx, drawMask } from './drawfx.js';
+import { openStore } from './store.js?v=c2f13502';
+import { renderBracket } from './render.js?v=c2f13502';
+import { withDefaults, drawTiming } from './banner.js?v=c2f13502';
+import { createBannerUI } from './bannerui.js?v=c2f13502';
+import { parseJSON, esc } from './util.js?v=c2f13502';
+import { createBracket, setResult, analyze, nextMatch, publicView, autoTimes, revealSteps, MODE_ODD, MODE_POW2, THIRD } from './bracket.js?v=c2f13502';
+import { startStars } from './bg.js?v=c2f13502';
+import { createDrawFx, drawMask } from './drawfx.js?v=c2f13502';
 
 const q = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);

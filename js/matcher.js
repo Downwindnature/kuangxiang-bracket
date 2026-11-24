@@ -1,6 +1,6 @@
 // matcher.js — 選手抽籤：3 人隊直接成隊，2 人組與 1 人報名隨機媒合成 3 人一隊
-import { shuffle, cryptoRandom } from './bracket.js';
-import { uid } from './util.js';
+import { shuffle, cryptoRandom } from './bracket.js?v=c2f13502';
+import { uid } from './util.js?v=c2f13502';
 
 export function regMap(regs) {
   const m = {};

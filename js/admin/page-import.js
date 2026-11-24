@@ -1,8 +1,8 @@
 // admin/page-import.js — 表單匯入：Excel／CSV、Google 表單同步、手動新增、統計與完整資料表
-import { S, saveRegs, saveSync, saveRoster, snapshot, emit } from './state.js';
-import * as I from '../importer.js';
-import { esc, fmtDateTime, uid } from '../util.js';
-import { toast, modal, confirmDlg, busy } from './ui.js';
+import { S, saveRegs, saveSync, saveRoster, snapshot, emit } from './state.js?v=c2f13502';
+import * as I from '../importer.js?v=c2f13502';
+import { esc, fmtDateTime, uid } from '../util.js?v=c2f13502';
+import { toast, modal, confirmDlg, busy, pageHead } from './ui.js?v=c2f13502';
 
 const XLSX_URL = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs';
 let XLSX = null;
@@ -45,9 +45,9 @@ export function render(main) {
   }
   const lastSync = S.sync && S.sync.last ? fmtDateTime(S.sync.last) : '尚未同步';
   main.innerHTML = `
-    <h2 class="page-title">表單匯入</h2>
+    ${pageHead('表單匯入', 'import')}
     <p class="lead">匯入 Excel／CSV，或直接同步 Google 表單的回覆。資料會自動統計，並整理出每筆報名的隊伍名稱、隊長、隊員與聯絡資料；顯示屏與抽籤都使用這裡的資料。</p>
-    <section class="card">
+    <section class="card" id="impStats">
       <div class="stats">
         <div class="stat"><b>${st.total}</b><span>報名筆數</span></div>
         <div class="stat"><b>${st.t3}</b><span>3 人隊伍</span></div>
@@ -62,7 +62,7 @@ export function render(main) {
       </div>
       ${st.leftPairs || st.leftSingles ? `<p class="hint">媒合後預計還會剩：${st.leftPairs ? `${st.leftPairs} 組 2 人報名缺 1 人` : ''}${st.leftPairs && st.leftSingles ? '、' : ''}${st.leftSingles ? `${st.leftSingles} 位 1 人報名` : ''}。</p>` : ''}
     </section>
-    <section class="card">
+    <section class="card" id="impSrc">
       <h3>匯入資料</h3>
       <div class="drop" id="drop">
         <div>把 Excel（.xlsx / .xls）或 CSV 檔拖到這裡</div>
@@ -81,7 +81,7 @@ export function render(main) {
         <button id="clearRegs" class="ghost" ${S.regs.length ? '' : 'disabled'}>清空報名資料</button>
       </div>
     </section>
-    <section class="card">
+    <section class="card" id="impRoster">
       <h3>玩家名冊比對（選用）</h3>
       <p class="hint">匯入「狂想之息玩家名字紀錄表」這類名冊（要有「遊戲ID」欄），報名資料會用遊戲 ID 比對，顯示常用稱呼與現居地，找不到的會標示「名冊無此 ID」。</p>
       <div class="btns">
@@ -90,7 +90,7 @@ export function render(main) {
         ${S.roster ? `<span class="hint">目前名冊：${S.roster.count} 筆（${esc(S.roster.file || '')}，${esc(fmtDateTime(S.roster.at))}）</span><button id="rosterClear" class="ghost">清除名冊</button>` : '<span class="hint">尚未匯入名冊</span>'}
       </div>
     </section>
-    <section class="card">
+    <section class="card" id="impList">
       <h3>完整報名資料（${S.regs.length} 筆）</h3>
       <div class="inline">
         <input id="q" placeholder="搜尋隊伍、暱稱、ID、Discord…" value="${esc(S.ui.impQuery || '')}" style="flex:1;min-width:220px">

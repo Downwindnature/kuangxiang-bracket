@@ -1,17 +1,25 @@
 // admin/page-draw.js — 選手抽籤：組隊媒合 → 賽程抽籤（含輪空設定）→ 公布／逐一揭曉
-import { S, saveTeams, saveBracket, saveBanner, saveSettings, saveDraw, snapshot, emit, rm, teamNames } from './state.js';
-import { buildTeams, refreshTeams, swapMembers, memberInfo, teamComplete } from '../matcher.js';
-import { createBracket, analyze, makeMask, byeSummary, roundCounts, roundNames, swapLeaves, publicView, teamCount, hasResults, MODE_ODD, MODE_POW2, MAX_TEAMS } from '../bracket.js';
-import { renderBracket } from '../render.js';
-import { regStats } from '../importer.js';
-import { withDefaults, DRAW_FX } from '../banner.js';
-import * as L from './livedraw.js';
-import { esc } from '../util.js';
-import { toast, confirmDlg } from './ui.js';
-import { rosterTag } from './page-import.js';
+import { S, saveTeams, saveBracket, saveBanner, saveSettings, saveDraw, snapshot, emit, rm, teamNames } from './state.js?v=c2f13502';
+import { buildTeams, refreshTeams, swapMembers, memberInfo, teamComplete } from '../matcher.js?v=c2f13502';
+import { createBracket, analyze, makeMask, byeSummary, roundCounts, roundNames, swapLeaves, publicView, teamCount, hasResults, MODE_ODD, MODE_POW2, MAX_TEAMS } from '../bracket.js?v=c2f13502';
+import { renderBracket } from '../render.js?v=c2f13502';
+import { regStats } from '../importer.js?v=c2f13502';
+import { withDefaults, DRAW_FX } from '../banner.js?v=c2f13502';
+import * as L from './livedraw.js?v=c2f13502';
+import { esc } from '../util.js?v=c2f13502';
+import { toast, confirmDlg, pageHead } from './ui.js?v=c2f13502';
+import { rosterTag } from './page-import.js?v=c2f13502';
 
 let busyTimer = null;
-export function cleanup() { L.stopAuto(); L.bindView(null); clearInterval(busyTimer); busyTimer = null; }
+let onSpy = null;
+export function cleanup() {
+  L.stopAuto();
+  L.bindView(null);
+  clearInterval(busyTimer);
+  busyTimer = null;
+  if (onSpy) removeEventListener('scroll', onSpy);
+  onSpy = null;
+}
 const stopAuto = () => L.stopAuto();
 
 const MODE_TEXT = {
@@ -20,15 +28,39 @@ const MODE_TEXT = {
 };
 
 export function render(main) {
+  if (onSpy) removeEventListener('scroll', onSpy); // 同一頁重畫（直播抽籤每抽一組也會重畫）：只換掉捲動偵測，不能停掉自動抽籤
+  onSpy = null;
   main.innerHTML = `
-    <h2 class="page-title">選手抽籤</h2>
+    ${pageHead('選手抽籤', 'draw')}
     <p class="lead">從現有的所有報名抽籤分隊：3 人報名直接成隊；1 人、2 人報名的選手隨機媒合成 3 人一隊。組好隊伍後抽進賽程表，可以自動處理輪空，也可以手動調整位置。</p>
+    <nav class="jump" aria-label="跳到">
+      <button type="button" data-jump="s1">① 組隊媒合<small>${S.teams.length ? `${S.teams.filter((t) => t.include).length} 隊` : '還沒組隊'}</small></button>
+      <button type="button" data-jump="s2">② 賽程抽籤<small>${S.bracket ? `${teamCount(S.bracket)} 隊` : '還沒抽籤'}</small></button>
+      <button type="button" data-jump="s3">③ 公布到顯示屏<small>${S.bracket && S.bracket.reveal ? '直播抽籤中' : S.bracket && S.bracket.published ? '已公布' : '還沒公布'}</small></button>
+    </nav>
     <section class="card" id="s1"></section>
     <section class="card" id="s2"></section>
     <section class="card" id="s3"></section>`;
   drawTeams(main);
   drawBracketStep(main);
   drawPublish(main);
+  // 上方的 ①②③：點了跳到那一區，捲動時標示目前在哪一區
+  const head = () => (document.querySelector('.top') || { offsetHeight: 0 }).offsetHeight + (main.querySelector('.jump') || { offsetHeight: 0 }).offsetHeight + 16;
+  main.querySelector('.jump').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-jump]');
+    if (!b) return;
+    const sec = main.querySelector('#' + b.dataset.jump);
+    window.scrollTo({ top: Math.max(0, sec.getBoundingClientRect().top + scrollY - head()), behavior: 'smooth' });
+  });
+  onSpy = () => {
+    const y = head() + 24;
+    let cur = 's1';
+    for (const id of ['s1', 's2', 's3']) { const el = main.querySelector('#' + id); if (el && el.getBoundingClientRect().top <= y) cur = id; }
+    if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4) cur = 's3';
+    main.querySelectorAll('.jump [data-jump]').forEach((b) => b.classList.toggle('on', b.dataset.jump === cur));
+  };
+  addEventListener('scroll', onSpy, { passive: true });
+  onSpy();
 }
 
 // ── ① 組隊媒合 ──

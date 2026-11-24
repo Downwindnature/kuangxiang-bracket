@@ -1,7 +1,7 @@
 // admin/page-reset.js — 重置（有「返回」可以復原）與還原紀錄
-import { S, resetAll, listHistory, restoreHistory, deleteHistory, latestResetSnapshot } from './state.js';
-import { esc, fmtDateTime } from '../util.js';
-import { toast, confirmDlg } from './ui.js';
+import { S, resetAll, listHistory, restoreHistory, deleteHistory, latestResetSnapshot } from './state.js?v=c2f13502';
+import { esc, fmtDateTime } from '../util.js?v=c2f13502';
+import { toast, confirmDlg, pageHead } from './ui.js?v=c2f13502';
 
 export async function undoLastReset(after) {
   const h = await latestResetSnapshot();
@@ -13,8 +13,8 @@ export async function undoLastReset(after) {
 
 export function render(main) {
   main.innerHTML = `
-    <h2 class="page-title">重置</h2>
-    <section class="card danger-card">
+    ${pageHead('重置', 'reset')}
+    <section class="card danger-card" id="rsReset">
       <h3>重置所有選手資料</h3>
       <p>會清空：<b>報名資料</b>（表單匯入）、<b>組好的隊伍</b>、<b>抽籤結果與賽程比分</b>。前台顯示屏上的選手資料也會一起消失，變回空白。</p>
       <p class="hint">不會清空：顯示屏的文字與外觀設定、Google 同步設定、玩家名冊。</p>
@@ -24,7 +24,7 @@ export function render(main) {
       </div>
       <p class="hint" id="undoInfo"></p>
     </section>
-    <section class="card">
+    <section class="card" id="rsHist">
       <h3>還原紀錄</h3>
       <p class="hint">重置、匯入、同步、重新媒合、重新抽籤之前都會自動備份（最多保留 ${S.store.mode === 'local' ? 12 : 30} 筆）。也可以還原到任何一個時間點。</p>
       <div class="tbl-wrap"><table class="tbl" id="hist"><tbody><tr><td class="dim">讀取中…</td></tr></tbody></table></div>
