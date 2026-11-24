@@ -1,8 +1,9 @@
 // display.js — 前台顯示屏
 import { openStore } from './store.js';
 import { renderBracket } from './render.js';
-import { bannerView, withDefaults, drawTiming } from './banner.js';
-import { parseJSON, fitText, esc } from './util.js';
+import { withDefaults, drawTiming } from './banner.js';
+import { createBannerUI } from './bannerui.js';
+import { parseJSON, esc } from './util.js';
 import { createBracket, setResult, analyze, nextMatch, publicView, autoTimes, revealSteps, MODE_ODD, MODE_POW2, THIRD } from './bracket.js';
 import { startStars } from './bg.js';
 import { createDrawFx, drawMask } from './drawfx.js';
@@ -13,6 +14,7 @@ const stage = $('stage');
 const board = $('board');
 const bannerEl = $('banner');
 const BOARD_W = 1868, BOARD_H = 800;
+const PAGE_TITLE = document.title;
 
 if (q.has('obs')) document.body.classList.add('obs');
 startStars($('stars'));
@@ -28,8 +30,8 @@ const S = { settings: {}, banner: null, bracket: null, teams: null };
 let now = () => Date.now();
 let prevRender = null;
 let lastBoardKey = '';
-let lastBannerKey = '';
 let dataKey = '';
+const bannerUI = createBannerUI(bannerEl, { now: () => now() });
 const fx = createDrawFx(stage, { now: () => now(), board, onFrame: () => { renderBoard(); tickBanner(); } });
 
 function liveIdOf() {
@@ -87,16 +89,9 @@ function renderTeams(data, st) {
   }
 }
 
+// 上方看板：一般樣式／跑馬燈樣式（bannerui.js）
 function tickBanner() {
-  const v = bannerView(S.banner, { bracket: S.bracket, settings: S.settings, now: now() });
-  if (v.key === lastBannerKey) return;
-  lastBannerKey = v.key;
-  bannerEl.className = 'banner ' + v.cls;
-  const el = document.createElement('div');
-  el.className = 'bn-inner enter';
-  el.innerHTML = v.html;
-  bannerEl.replaceChildren(el);
-  el.querySelectorAll('.fit').forEach((e) => fitText(e, { min: 0.4 }));
+  bannerUI.update({ banner: S.banner, bracket: S.bracket, settings: S.settings });
 }
 
 function apply(v) {
@@ -105,7 +100,7 @@ function apply(v) {
   S.banner = parseJSON(v.banner, null);
   S.bracket = parseJSON(v.bracket, null);
   S.teams = parseJSON(v.teams, null);
-  if (S.settings.title) document.title = `${S.settings.title}｜賽程表`;
+  document.title = S.settings.title ? `${S.settings.title}｜賽程表` : PAGE_TITLE;
   refresh();
 }
 
@@ -201,10 +196,20 @@ function demo() {
     const offset = bm === 'live' ? 7000 : bm === 'next' ? 22500 : 0;
     S.banner = { mode: 'flow', cur, next: 'auto', at: t0 - offset, dur: { vs: 6, live: 15, next: 6 } };
   }
+  demoLook();
   if (q.get('stage') === 'teams') {
     S.teams = { title: '參賽隊伍', teams: ids.slice(0, Math.min(n, 30)).map((id, i) => ({ n: names[id], m: [names[id], `隊員${i}A`, `隊員${i}B`], c: 0 })), waiting: ['小明', '阿華', 'Kiki'] };
   }
   refresh();
+}
+
+// 看板樣式示範：&look=marquee（跑馬燈）、&speed=slow、&extra=現在時間：{日期} {星期} {時間}、&title=（留空）、&sub=
+function demoLook() {
+  if (q.get('look')) S.banner.look = q.get('look');
+  if (q.has('extra')) S.banner.extra = q.get('extra');
+  if (q.has('speed')) S.banner.speed = q.get('speed');
+  if (q.has('title')) S.settings.title = q.get('title');
+  if (q.has('sub')) S.settings.subtitle = q.get('sub');
 }
 
 // 抽籤動畫示範：index.html?demo=12&drawfx=1（自動一組一組抽）；&step=2&t=4.5 停在第 3 步的第 4.5 秒；&nofx=1 不播動畫
@@ -226,12 +231,14 @@ function demoDraw(br, names, n) {
         pool: steps.slice(i).reduce((a, x) => a + x.l.length, 0), last: i === steps.length - 1, at,
       },
     };
+    demoLook();
     refresh();
   };
   if (q.has('t')) { show(Math.max(0, Math.min(steps.length - 1, Number(q.get('step')) || 0)), Number(q.get('t')) * 1000); return; }
   const startView = () => {
     S.bracket = publicView(br, names, { steps, shown: 0 });
     S.banner = { mode: 'draw', at: Date.now(), draw: { kind: 'start', total: n, at: Date.now() } };
+    demoLook();
     refresh();
   };
   let i = -1;

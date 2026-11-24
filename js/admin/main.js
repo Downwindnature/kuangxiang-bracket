@@ -144,11 +144,13 @@ function onRemote(why) {
     const a = document.activeElement;
     if (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && document.getElementById('main').contains(a)) return; // 正在輸入時先不重畫
     if (document.querySelector('.mask')) return;
-    route();
+    route({ keepScroll: true }); // 同一頁重畫：停在原本看的位置
     toast('資料已由其他分頁／管理員更新', { type: 'info', ms: 2500 });
 }
 
-function route() {
+function route(opt) {
+  const keep = !!(opt && opt.keepScroll);
+  const y = window.scrollY;
   const key = (location.hash || '#home').slice(1);
   const main = document.getElementById('main');
   if (!main) return;
@@ -159,7 +161,14 @@ function route() {
   if (!page) { renderHome(main); return; }
   document.title = `${page.title}｜狂想之息後台`;
   page.mod.render(main);
-  window.scrollTo(0, 0);
+  // 指定要停在哪一區（例如從抽籤球畫面回來 → ③ 公布到顯示屏）
+  const target = S.ui.scrollTo && main.querySelector('#' + S.ui.scrollTo);
+  S.ui.scrollTo = null;
+  if (target) {
+    const top = document.querySelector('.top');
+    const off = (top ? top.offsetHeight : 0) + 12;
+    window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY - off));
+  } else window.scrollTo(0, keep ? y : 0);
 }
 
 function renderHome(main) {

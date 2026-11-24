@@ -1,14 +1,22 @@
 // admin/page-display.js — 顯示屏設定：通知看板、賽程與比分、顯示內容與外觀
 import { S, saveBanner, saveSettings, saveBracket, emit, teamNames, publicTeamsPayload } from './state.js';
 import { analyze, allMatches, matchTitle, roundNames, setResult, clearResult, setScores, setTime, autoTimes, getNode, playOrder, publicView, teamCount } from '../bracket.js';
-import { bannerView, withDefaults, resolveNext, BANNER_DEFAULTS } from '../banner.js';
+import { withDefaults, resolveNext, liveText, extraLines, BANNER_DEFAULTS } from '../banner.js';
+import { createBannerUI } from '../bannerui.js';
 import { renderBracket } from '../render.js';
 import { regStats } from '../importer.js';
-import { esc, fitText } from '../util.js';
+import { esc } from '../util.js';
 import { toast, modal, confirmDlg } from './ui.js';
 
 let timer = null;
-export function cleanup() { clearInterval(timer); timer = null; }
+let pvUI = null; // 看板預覽
+export function cleanup() {
+  clearInterval(timer);
+  timer = null;
+  if (pvUI) pvUI.destroy();
+  pvUI = null;
+}
+const CLOCK_LINE = '現在時間：{日期} {星期} {時間}';
 
 function pubBracket() {
   return S.bracket ? publicView(S.bracket, teamNames(), S.bracket.reveal) : null;
@@ -46,6 +54,7 @@ export function render(main) {
 
 // ── 通知看板 ──
 function renderBanner(body) {
+  cleanup(); // 同一頁重畫時，先停掉舊的預覽
   const b = S.banner;
   const pb = pubBracket();
   const A = pb ? analyze(pb) : null;
@@ -61,11 +70,27 @@ function renderBanner(body) {
   };
   const modeText = modeLabel(b, S.store.now());
   const published = !!(S.bracket && S.bracket.published);
+  const marquee = b.look === 'marquee';
+  const nowMs = S.store.now();
+  const ex = (tk) => esc(liveText(tk, nowMs));
+  const xCount = extraLines(Object.assign({}, b, { extraOn: true })).length;
   body.innerHTML = `
     <section class="card">
       <h3>看板預覽 <span class="tag" id="bnModeTag">${esc(modeText)}</span></h3>
       <div class="pv-banner"><div class="pv-scale"><section class="banner pv"><div class="bn-inner"></div></section></div></div>
-      <p class="hint">前台最上方的固定顯示屏。對戰流程：<b>VS</b>（${d.vs} 秒）→ <b>正在比賽中</b>（${d.live} 秒）→ <b>下一場請準備</b>（${d.next} 秒）${b.loop ? '→ 循環' : ''}。按「結束本場、登錄比分」後先顯示勝負公告（${d.result} 秒），接著一直顯示<b>下一場請準備</b>，直到按「開始下一場」。</p>
+      <div class="opt-row">
+        <span>看板樣式</span>
+        <label class="chk"><input type="radio" name="bnLook" value="board" ${marquee ? '' : 'checked'}> 一般（內容依時間輪流切換）</label>
+        <label class="chk"><input type="radio" name="bnLook" value="marquee" ${marquee ? 'checked' : ''}> 跑馬燈（文字由右往左捲動）</label>
+        <label class="chk">跑馬燈速度
+          <select id="bnSpeed" ${marquee ? '' : 'disabled'}>
+            ${[['slow', '慢'], ['normal', '普通'], ['fast', '快']].map(([v, l]) => `<option value="${v}" ${String(b.speed) === v ? 'selected' : ''}>${l}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      ${marquee
+    ? '<p class="hint">跑馬燈：<b>正在比賽中</b>的對戰、<b>下一場請準備</b>與額外句子排成一列輪流捲動（不受下面的秒數影響）。按「開始這場」「結束本場、登錄比分」、發布公告或抽出新的一組時，會立刻換成新的內容。</p>'
+    : `<p class="hint">前台最上方的固定顯示屏。對戰流程：<b>VS</b>（${d.vs} 秒）→ <b>正在比賽中</b>（${d.live} 秒）→ <b>下一場請準備</b>（${d.next} 秒）${b.loop ? '→ 循環' : ''}。按「結束本場、登錄比分」後先顯示勝負公告（${d.result} 秒），接著一直顯示<b>下一場請準備</b>，直到按「開始下一場」。</p>`}
     </section>
     <section class="card">
       <h3>對戰流程</h3>
@@ -88,6 +113,17 @@ function renderBanner(body) {
       <div class="btns"><button id="bnCustomGo" class="primary">📢 發布公告</button><button id="bnCustomOff" class="ghost">取消公告</button></div>
     </section>
     <section class="card">
+      <h3>額外顯示句子 <span class="tag ${b.extraOn !== false && xCount ? 'ok' : ''}">${b.extraOn === false ? '已關閉' : xCount ? `${xCount} 句` : '沒有設定'}</span></h3>
+      <label class="chk"><input type="checkbox" id="xOn" ${b.extraOn !== false ? 'checked' : ''}> 在看板上顯示額外句子</label>
+      <textarea id="xText" rows="3" placeholder="一行一句，最多 10 句。例如：&#10;${esc(CLOCK_LINE)}&#10;請各隊隊長在比賽開始前 10 分鐘進入自訂房">${esc(b.extra || '')}</textarea>
+      <div class="inline">
+        <label>一般樣式每句顯示 <input id="xEvery" type="number" min="2" max="120" value="${esc(b.extraEvery)}" style="width:72px"> 秒</label>
+        <button id="xClock" class="ghost">＋ 加入「現在時間」這句</button>
+      </div>
+      <p class="hint">即時代碼（會一直更新）：<code>{日期}</code> → ${ex('{日期}')}、<code>{星期}</code> → ${ex('{星期}')}、<code>{時間}</code> → ${ex('{時間}')}；也可以分開用 <code>{年}</code> <code>{月}</code> <code>{日}</code> <code>{時}</code> <code>{分}</code> <code>{秒}</code>，<code>{T}</code> = 賽事標題。<br>一般樣式：顯示在看板右下角，有好幾句時輪流換；待機又沒有賽事標題時改顯示在正中間。跑馬燈：接在比賽訊息後面一起捲動。</p>
+      <div class="btns"><button id="xSave" class="primary">儲存並套用到前台</button><button id="xClear" class="ghost">清空</button></div>
+    </section>
+    <section class="card">
       <h3>顯示時間與文字</h3>
       <div class="form-grid four">
         <label>VS 畫面（秒）<input type="number" min="0" max="120" id="dVs" value="${d.vs}"></label>
@@ -103,7 +139,7 @@ function renderBanner(body) {
         <label>下一場請準備<input id="tNext" value="${esc(t.next)}"></label>
         <label>勝負公告<input id="tResult" value="${esc(t.result)}"></label>
         <label>冠軍公告<input id="tChamp" value="${esc(t.champ)}"></label>
-        <label>待機文字（留空 = 顯示賽事標題）<input id="tIdle" value="${esc(t.idle)}"></label>
+        <label>待機文字（留空 = 顯示賽事標題；兩個都留空 = 看板空白）<input id="tIdle" value="${esc(t.idle)}"></label>
       </div>
       <p class="hint">{A}、{B} = 兩隊名稱，{W} = 勝隊，{R} = 輪次，{T} = 賽事標題。文字裡的「VS」會自動加上特效。</p>
       <div class="btns"><button id="bnSave" class="primary">儲存</button><button id="bnDefault" class="ghost">恢復預設文字</button></div>
@@ -112,23 +148,17 @@ function renderBanner(body) {
   const $ = (id) => body.querySelector('#' + id);
   const pvBanner = body.querySelector('.banner.pv');
   const pvScale = body.querySelector('.pv-scale');
-  let lastKey = '';
+  pvUI = createBannerUI(pvBanner, { now: () => S.store.now(), base: 'banner pv' });
+  const ui = pvUI;
   const tick = () => {
+    if (ui !== pvUI) return;
     const w = pvScale.parentElement.clientWidth;
     const s = Math.min(1, w / 1480);
     pvScale.style.transform = `scale(${s})`;
     pvScale.parentElement.style.height = 156 * s + 'px';
-    const v = bannerView(S.banner, { bracket: pubBracket(), settings: S.settings, now: S.store.now() });
     const tag = body.querySelector('#bnModeTag');
     if (tag) tag.textContent = modeLabel(S.banner, S.store.now());
-    if (v.key === lastKey) return;
-    lastKey = v.key;
-    pvBanner.className = 'banner pv ' + v.cls;
-    const el = document.createElement('div');
-    el.className = 'bn-inner enter';
-    el.innerHTML = v.html;
-    pvBanner.replaceChildren(el);
-    el.querySelectorAll('.fit').forEach((e) => fitText(e, { min: 0.4 }));
+    ui.update({ banner: S.banner, bracket: pubBracket(), settings: S.settings });
   };
   tick();
   timer = setInterval(tick, 250);
@@ -136,9 +166,43 @@ function renderBanner(body) {
   const setBanner = async (patch, msg) => {
     S.banner = withDefaults(Object.assign({}, S.banner, patch));
     await saveBanner();
-    lastKey = '';
+    ui.reset();
     tick();
     if (msg) toast(msg);
+  };
+  // 看板樣式：一般／跑馬燈（切換後立即套用到前台）
+  body.querySelectorAll('input[name=bnLook]').forEach((r) => {
+    r.onchange = async () => {
+      await setBanner({ look: r.value }, r.value === 'marquee' ? '前台看板已換成跑馬燈樣式' : '前台看板已換成一般樣式');
+      renderBanner(body);
+    };
+  });
+  $('bnSpeed').onchange = async () => { await setBanner({ speed: $('bnSpeed').value }, '已調整跑馬燈速度'); };
+  // 額外顯示句子
+  $('xClock').onclick = () => {
+    const ta = $('xText');
+    const ls = ta.value.split(/\n/).map((x) => x.trim()).filter(Boolean);
+    if (ls.includes(CLOCK_LINE)) return toast('已經有這一句了', { type: 'warn' });
+    ta.value = [...ls, CLOCK_LINE].join('\n');
+    $('xOn').checked = true;
+    toast('已加入，按「儲存並套用到前台」就會顯示');
+  };
+  $('xSave').onclick = async () => {
+    const lines = $('xText').value.split(/\n/).map((x) => x.trim()).filter(Boolean);
+    if (lines.length > 10) toast('最多 10 句，超過的部分不會顯示', { type: 'warn' });
+    const every = Number($('xEvery').value);
+    await setBanner({
+      extra: lines.join('\n'),
+      extraOn: $('xOn').checked,
+      extraEvery: Number.isFinite(every) ? Math.max(2, Math.min(120, every)) : BANNER_DEFAULTS.extraEvery,
+    }, !$('xOn').checked ? '已關閉額外句子' : lines.length ? '額外句子已套用到前台' : '已儲存（目前沒有句子）');
+    renderBanner(body);
+  };
+  $('xClear').onclick = async () => {
+    if (!S.banner.extra) { $('xText').value = ''; return; }
+    if (!(await confirmDlg('清空所有額外顯示句子？'))) return;
+    await setBanner({ extra: '' }, '已清空額外句子');
+    renderBanner(body);
   };
   $('bnCur').onchange = () => { S.banner.cur = $('bnCur').value || null; };
   $('bnNext').onchange = async () => { await setBanner({ next: $('bnNext').value }); };
@@ -408,7 +472,7 @@ function renderLook(body) {
     <section class="card">
       <h3>文字與樣式</h3>
       <div class="form-grid two">
-        <label>賽事標題（待機時顯示）<input id="sTitle" value="${esc(st.title)}"></label>
+        <label>賽事標題（待機時顯示；留空 = 前台看板空白）<input id="sTitle" value="${esc(st.title)}" placeholder="例如：狂想之息 比賽"></label>
         <label>副標題<input id="sSub" value="${esc(st.subtitle)}" placeholder="例如：第五人格｜2027/05/08"></label>
       </div>
       <div class="opt-row"><span>隊伍名稱顯示</span>${radio('nameMode', 'team', '隊伍名稱')}${radio('nameMode', 'captain', '隊長暱稱')}${radio('nameMode', 'both', '隊伍名稱（隊長）')}</div>

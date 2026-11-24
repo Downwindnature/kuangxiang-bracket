@@ -7,7 +7,7 @@ import { checkRegs } from '../importer.js';
 import { withDefaults } from '../banner.js';
 
 export const SETTINGS_DEFAULTS = {
-  title: '狂想之息 比賽',
+  title: '',          // 賽事標題：預設留空（前台看板待機時就是空白）
   subtitle: '',
   stage: 'auto',        // auto 自動 / blank 空白 / teams 參賽名單 / bracket 賽程表
   nameMode: 'team',     // team 隊伍名稱 / captain 隊長暱稱 / both 隊名（隊長）

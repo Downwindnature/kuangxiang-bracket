@@ -1,9 +1,9 @@
 // admin/page-drawball.js — 全螢幕抽籤球畫面：直播抽籤時，後台整個變成抽籤球（其他部分都隱藏）
 import { S, teamNames } from './state.js';
 import { publicView, teamCount } from '../bracket.js';
-import { bannerView } from '../banner.js';
+import { createBannerUI } from '../bannerui.js';
 import { createDrawFx, drawMask } from '../drawfx.js';
-import { esc, fitText } from '../util.js';
+import { esc } from '../util.js';
 import * as L from './livedraw.js';
 
 // 舞台 1920×1080：抽獎球放左邊中間，右邊是「已抽出」清單
@@ -13,7 +13,7 @@ let root = null;
 let fx = null;
 let timer = null;
 let onResize = null;
-let lastBannerKey = '';
+let bannerUI = null;
 let lastListKey = '';
 let lastMasked = [];
 
@@ -26,6 +26,10 @@ export function cleanup() {
   onResize = null;
   if (fx) fx.destroy();
   fx = null;
+  if (bannerUI) bannerUI.destroy();
+  bannerUI = null;
+  // 按「回到後台」（或瀏覽器的上一頁）回到選手抽籤時，直接停在「③ 公布到顯示屏」
+  if (root && location.hash === '#draw') S.ui.scrollTo = 's3';
   if (root) root.remove();
   root = null;
   document.body.classList.remove('fs-draw');
@@ -37,7 +41,6 @@ export function render(main) {
   cleanup();
   main.innerHTML = '';
   document.body.classList.add('fs-draw');
-  lastBannerKey = '';
   lastListKey = '';
   lastMasked = [];
   root = document.createElement('div');
@@ -68,6 +71,7 @@ export function render(main) {
   onResize = () => { fit(); if (fx) fx.repaint(); };
   addEventListener('resize', onResize);
   const list = root.querySelector('.dball-list');
+  bannerUI = createBannerUI(root.querySelector('.banner'), { now: () => S.store.now() });
   fx = createDrawFx(stage, { now: () => S.store.now(), board: list, persistent: true, backdrop: false, geom: GEOM, onFrame: () => refreshText() });
 
   root.querySelector('#dbNext').onclick = async () => {
@@ -102,18 +106,8 @@ function refresh() {
 function refreshText(info = L.liveInfo()) {
   if (!root) return;
   const now = S.store.now();
-  // 上方看板（跟前台一樣）
-  const v = bannerView(S.banner, { bracket: pubBracket(), settings: S.settings, now });
-  if (v.key !== lastBannerKey) {
-    lastBannerKey = v.key;
-    const bn = root.querySelector('.banner');
-    bn.className = 'banner ' + v.cls;
-    const el = document.createElement('div');
-    el.className = 'bn-inner enter';
-    el.innerHTML = v.html;
-    bn.replaceChildren(el);
-    el.querySelectorAll('.fit').forEach((e) => fitText(e, { min: 0.4 }));
-  }
+  // 上方看板（跟前台一樣，一般樣式／跑馬燈樣式）
+  bannerUI.update({ banner: S.banner, bracket: pubBracket(), settings: S.settings });
   // 右邊「已抽出」清單：正在播動畫的那一組先顯示「？」，球飛進來的時候才揭曉
   const mask = drawMask(S.banner, now) || [];
   const drawn = L.drawnList();
