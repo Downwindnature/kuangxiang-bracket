@@ -337,3 +337,23 @@ details summary { cursor: pointer; color: var(--ink-2); margin: 8px 0; }
 .tp-foot .tp-skip { padding: 7px 10px; font-weight: 600; color: var(--ink-2); }
 .tp-foot [hidden] { display: none; }
 kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border-radius: 5px; font: 12px/1.6 inherit; text-align: center; background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .25); }
+
+/* 選手列表 */
+.toolbar { align-items: center; margin-bottom: 10px; }
+.toolbar input[type=search] { flex: 1; min-width: 220px; }
+.inline-sel { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; white-space: nowrap; }
+.tbl.players td { vertical-align: middle; }
+.tbl.players td.nick { font-weight: 700; white-space: nowrap; }
+.tbl.players td.gid { font-size: 13px; }
+.tbl.players tr.band1 td { background: rgba(70, 50, 160, .12); }
+.tbl.players tr.g-start td { border-top: 1px solid rgba(170, 150, 255, .35); }
+.tbl.players tbody tr { cursor: pointer; }
+.tbl.players td.pw select { min-width: 110px; padding: 4px 6px; }
+.pw-avg { display: inline-block; margin-left: 4px; padding: 0 7px; border-radius: 999px; font-size: 12px; color: #ffe3a8; background: rgba(255, 190, 80, .14); border: 1px solid rgba(255, 190, 80, .4); }
+.pl-set h4 { margin: 16px 0 6px; font-size: 15px; }
+.pl-set .chk.big { font-size: 16px; font-weight: 800; }
+.pl-set textarea { width: 100%; }
+.pl-set .pw-panel[hidden] { display: none; }
+.pw-first { margin: 10px 0 0; }
+.pw-first summary { cursor: pointer; color: var(--ink-2); }
+.tbl tr.warnrow td { background: rgba(255, 170, 40, .12); }

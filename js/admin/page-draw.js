@@ -1,14 +1,15 @@
 // admin/page-draw.js — 選手抽籤：組隊媒合 → 賽程抽籤（含輪空設定）→ 公布／逐一揭曉
-import { S, saveTeams, saveBracket, saveBanner, saveSettings, saveDraw, snapshot, emit, rm, teamNames } from './state.js?v=c2f13502';
-import { buildTeams, refreshTeams, swapMembers, memberInfo, teamComplete } from '../matcher.js?v=c2f13502';
-import { createBracket, analyze, makeMask, byeSummary, roundCounts, roundNames, swapLeaves, publicView, teamCount, hasResults, MODE_ODD, MODE_POW2, MAX_TEAMS } from '../bracket.js?v=c2f13502';
-import { renderBracket } from '../render.js?v=c2f13502';
-import { regStats } from '../importer.js?v=c2f13502';
-import { withDefaults, DRAW_FX } from '../banner.js?v=c2f13502';
-import * as L from './livedraw.js?v=c2f13502';
-import { esc } from '../util.js?v=c2f13502';
-import { toast, confirmDlg, pageHead } from './ui.js?v=c2f13502';
-import { rosterTag } from './page-import.js?v=c2f13502';
+import { S, saveTeams, saveBracket, saveBanner, saveSettings, saveDraw, snapshot, emit, rm, teamNames } from './state.js?v=2628f905';
+import { buildTeams, refreshTeams, swapMembers, memberInfo, teamComplete, regMap } from '../matcher.js?v=2628f905';
+import { matchOptions, drawOptions } from './power.js?v=2628f905';
+import { createBracket, analyze, makeMask, byeSummary, roundCounts, roundNames, swapLeaves, publicView, teamCount, hasResults, MODE_ODD, MODE_POW2, MAX_TEAMS } from '../bracket.js?v=2628f905';
+import { renderBracket } from '../render.js?v=2628f905';
+import { regStats } from '../importer.js?v=2628f905';
+import { withDefaults, DRAW_FX } from '../banner.js?v=2628f905';
+import * as L from './livedraw.js?v=2628f905';
+import { esc } from '../util.js?v=2628f905';
+import { toast, confirmDlg, pageHead } from './ui.js?v=2628f905';
+import { rosterTag } from './page-import.js?v=2628f905';
 
 let busyTimer = null;
 let onSpy = null;
@@ -117,19 +118,19 @@ function drawTeams(main) {
     return fresh;
   };
   if (q('tBuild')) q('tBuild').onclick = async () => {
-    S.teams = buildTeams(S.regs);
+    S.teams = buildTeams(S.regs, matchOptions());
     await afterTeams(`已組成 ${S.teams.filter((t) => t.include).length} 隊`);
   };
   if (q('tRe')) q('tRe').onclick = async () => {
     const warn = S.bracket ? '\n\n注意：目前的抽籤結果會被清除（前台賽程也會撤下）。' : '';
     if (!(await confirmDlg(`重新隨機媒合 1 人、2 人報名的選手？自行組隊的 3 人隊伍不會變。${warn}`, { ok: '重新媒合', danger: !!S.bracket }))) return;
     await snapshot('重新媒合前');
-    S.teams = keepSelfIds(buildTeams(S.regs));
+    S.teams = keepSelfIds(buildTeams(S.regs, matchOptions()));
     if (S.bracket) { S.bracket = null; await saveBracket(); }
     await afterTeams('已重新媒合');
   };
   if (q('tAdd')) q('tAdd').onclick = async () => {
-    const r = refreshTeams(S.teams, S.regs);
+    const r = refreshTeams(S.teams, S.regs, matchOptions());
     if (!r.added) { toast('沒有新的選手需要補進來'); S.teams = r.teams; return afterTeams(); }
     S.teams = r.teams;
     await afterTeams(`已補進 ${r.added} 隊（新報名的選手）`);
@@ -265,7 +266,7 @@ function drawBracketStep(main) {
       if (!(await confirmDlg(`重新抽籤會換掉目前的對戰組合${played ? '，已登錄的比賽結果（勝方、比分）也會清除' : ''}${br.published ? '，前台的賽程會先撤下，抽完要再公布一次' : ''}。確定嗎？`, { danger: true, ok: '重新抽籤' }))) return;
       await snapshot('重新抽籤前');
     }
-    S.bracket = createBracket(inc.map((t) => t.id), { mode, third });
+    S.bracket = createBracket(inc.map((t) => t.id), Object.assign({ mode, third }, drawOptions(regMap(S.regs))));
     S.bracket.published = false;
     S.bracket.reveal = null;
     S.bracket.drawnAt = Date.now();

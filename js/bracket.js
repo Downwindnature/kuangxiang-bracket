@@ -88,15 +88,84 @@ export function clone(o) {
 }
 
 // 建立賽程（抽籤）：隊伍隨機放進結構裡的位置
-export function createBracket(teamIds, { mode = MODE_ODD, third = true, rng = cryptoRandom } = {}) {
+// strength(id) 有給的話（後台的平衡設定）：輪空一樣隨機抽，第一輪則盡量讓強度相近的兩隊對戰
+export function createBracket(teamIds, { mode = MODE_ODD, third = true, rng = cryptoRandom, strength = null, maxGap = 1 } = {}) {
   const ids = teamIds.filter(Boolean);
   const st = makeMask(ids.length, mode);
   if (!st) return null;
-  shuffle(ids, rng);
   const leaves = st.mask.map(() => '');
-  let p = 0;
-  st.mask.forEach((v, i) => { if (v) leaves[i] = ids[p++]; });
+  const known = strength ? ids.filter((id) => isNum(strength(id))).length : 0;
+  if (known >= 2) {
+    const { pairs, solos } = firstRoundSlots(st.mask);
+    const pool = shuffle(ids.slice(), rng);
+    const byes = pool.splice(0, solos.length);        // 輪空：照規則隨機
+    const matches = shuffle(pairByStrength(pool, strength, maxGap, rng), rng);
+    pairs.forEach(([x, y], j) => {
+      const [a, b] = rng() < 0.5 ? matches[j] : [matches[j][1], matches[j][0]];
+      leaves[x] = a;
+      leaves[y] = b;
+    });
+    shuffle(solos, rng).forEach((x, j) => { leaves[x] = byes[j]; });
+  } else {
+    shuffle(ids, rng);
+    let p = 0;
+    st.mask.forEach((v, i) => { if (v) leaves[i] = ids[p++]; });
+  }
   return { v: 1, k: st.k, mode, third: !!third, leaves, m: {} };
+}
+
+const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
+
+// 第一輪的位置：兩格都有隊伍 = 一場比賽；只有一格 = 輪空
+export function firstRoundSlots(mask) {
+  const pairs = [], solos = [];
+  for (let i = 0; i < mask.length; i += 2) {
+    if (mask[i] && mask[i + 1]) pairs.push([i, i + 1]);
+    else if (mask[i]) solos.push(i);
+    else if (mask[i + 1]) solos.push(i + 1);
+  }
+  return { pairs, solos };
+}
+
+// 兩兩配對：每一對的強度差盡量不超過 maxGap，符合的對象裡隨機挑（保留抽籤的隨機性）
+// 沒有強度的隊伍當作平均值；先處理「能配的對象最少」的隊伍，失敗就重洗再試，留最好的一組
+export function pairByStrength(ids, strength, maxGap = 1, rng = cryptoRandom, tries = 0) {
+  const raw = ids.map((id) => strength(id));
+  const known = raw.filter(isNum);
+  const avg = known.length ? known.reduce((x, y) => x + y, 0) / known.length : 0;
+  const val = new Map(ids.map((id, i) => [id, isNum(raw[i]) ? raw[i] : avg]));
+  const gap = (a, b) => Math.abs(val.get(a) - val.get(b));
+  const ok = (a, b) => gap(a, b) <= maxGap + 1e-9;
+  const n = ids.length;
+  const rounds = tries || (n <= 32 ? 80 : n <= 64 ? 30 : 10);
+  let best = null;
+  for (let t = 0; t < rounds; t++) {
+    const pool = shuffle(ids.slice(), rng);
+    const pairs = [];
+    let bad = 0, worst = 0, total = 0;
+    while (pool.length > 1) {
+      let ai = 0, least = Infinity;
+      for (let i = 0; i < pool.length; i++) {
+        let c = 0;
+        for (let j = 0; j < pool.length; j++) if (j !== i && ok(pool[i], pool[j])) c++;
+        if (c < least) { least = c; ai = i; }
+      }
+      const a = pool.splice(ai, 1)[0];
+      const cand = pool.filter((x) => ok(a, x));
+      let b;
+      if (cand.length) b = cand[Math.floor(rng() * cand.length)];
+      else { b = pool.reduce((m, x) => (gap(a, x) < gap(a, m) ? x : m), pool[0]); bad++; }
+      pool.splice(pool.indexOf(b), 1);
+      const g = gap(a, b);
+      if (g > worst) worst = g;
+      total += g;
+      pairs.push([a, b]);
+    }
+    const better = !best || bad < best.bad || (bad === best.bad && (worst < best.worst - 1e-9 || (Math.abs(worst - best.worst) < 1e-9 && total < best.total)));
+    if (better) best = { pairs, bad, worst, total };
+    if (bad === 0) break;
+  }
+  return best ? best.pairs : [];
 }
 
 const isTeam = (x) => typeof x === 'string' && x !== '' && x !== '?';

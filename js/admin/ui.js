@@ -1,5 +1,5 @@
 // admin/ui.js — 對話框、提示訊息
-import { esc } from '../util.js?v=c2f13502';
+import { esc } from '../util.js?v=2628f905';
 
 export function toast(msg, { type = 'ok', ms = 3600, action = null } = {}) {
   const root = document.getElementById('toasts');

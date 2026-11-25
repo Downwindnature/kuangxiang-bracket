@@ -1,5 +1,5 @@
 // store.js — 資料層：有設定 Firebase 就用 Realtime Database，沒有就用單機測試模式（localStorage）
-import { FIREBASE_CONFIG, ACCOUNT_DOMAIN, DB_ROOT } from './firebase-config.js?v=c2f13502';
+import { FIREBASE_CONFIG, ACCOUNT_DOMAIN, DB_ROOT } from './firebase-config.js?v=2628f905';
 
 const FB = 'https://www.gstatic.com/firebasejs/13.4.0/';
 
@@ -9,6 +9,7 @@ export const PATHS = {
   bracket: 'private/bracket',
   sync: 'private/sync',
   roster: 'private/roster',
+  power: 'private/power',
   pub: 'public',
   pubSettings: 'public/settings',
   pubBanner: 'public/banner',

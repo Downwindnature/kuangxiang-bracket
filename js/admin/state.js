@@ -1,10 +1,10 @@
 // admin/state.js — 後台的資料狀態、存檔、發布到前台、還原紀錄
-import { PATHS } from '../store.js?v=c2f13502';
-import { parseJSON } from '../util.js?v=c2f13502';
-import { publicView, teamCount, clone } from '../bracket.js?v=c2f13502';
-import { regMap, teamLabel, memberInfo } from '../matcher.js?v=c2f13502';
-import { checkRegs } from '../importer.js?v=c2f13502';
-import { withDefaults } from '../banner.js?v=c2f13502';
+import { PATHS } from '../store.js?v=2628f905';
+import { parseJSON } from '../util.js?v=2628f905';
+import { publicView, teamCount, clone } from '../bracket.js?v=2628f905';
+import { regMap, teamLabel, memberInfo } from '../matcher.js?v=2628f905';
+import { checkRegs } from '../importer.js?v=2628f905';
+import { withDefaults } from '../banner.js?v=2628f905';
 
 export const SETTINGS_DEFAULTS = {
   title: '',          // 賽事標題：預設留空（前台看板待機時就是空白）
@@ -30,6 +30,7 @@ export const S = {
   banner: withDefaults(null),
   sync: {},
   roster: null,
+  power: null,   // 選手列表的進階設定（只存在後台的私人資料區）
   ui: {},
 };
 
@@ -54,6 +55,7 @@ function applyPrivate(p) {
   S.bracket = parseJSON(p.bracket, null);
   S.sync = p.sync || {};
   S.roster = parseJSON(p.roster, null);
+  S.power = parseJSON(p.power, null);
 }
 
 function applyPublic(p) {
@@ -66,7 +68,7 @@ export async function loadAll() {
   const [priv, pub] = await Promise.all([S.store.get('private'), S.store.get('public')]);
   applyPrivate(priv);
   applyPublic(pub);
-  for (const k of ['regs', 'teams', 'bracket', 'roster']) cache[`private/${k}`] = str((priv || {})[k]);
+  for (const k of ['regs', 'teams', 'bracket', 'roster', 'power']) cache[`private/${k}`] = str((priv || {})[k]);
   for (const k of ['settings', 'banner', 'bracket', 'teams']) cache[`public/${k}`] = str((pub || {})[k]);
 }
 
@@ -83,7 +85,7 @@ export function watchRemote() {
     }
     if (changed) { apply(val); emit('remote'); }
   };
-  S.store.watch('private', handle('private', ['regs', 'teams', 'bracket', 'roster'], applyPrivate));
+  S.store.watch('private', handle('private', ['regs', 'teams', 'bracket', 'roster', 'power'], applyPrivate));
   S.store.watch('public', handle('public', ['settings', 'banner'], applyPublic));
 }
 
@@ -141,6 +143,10 @@ export async function saveSync() {
 
 export async function saveRoster() {
   await put(PATHS.roster, S.roster);
+}
+
+export async function savePower() {
+  await put(PATHS.power, S.power);
 }
 
 export async function publishBracket() {

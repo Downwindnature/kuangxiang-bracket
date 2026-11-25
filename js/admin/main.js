@@ -1,23 +1,25 @@
 // admin/main.js — 後台入口：Firebase 登入 → 選單（顯示屏設定／表單匯入／選手抽籤／重置／回到前台）
-import { openStore, firebaseReady } from '../store.js?v=c2f13502';
-import { DB_ROOT } from '../firebase-config.js?v=c2f13502';
-import { startStars } from '../bg.js?v=c2f13502';
-import { S, loadAll, watchRemote, onChange } from './state.js?v=c2f13502';
-import { regStats } from '../importer.js?v=c2f13502';
-import { teamCount, analyze, allMatches } from '../bracket.js?v=c2f13502';
-import { esc } from '../util.js?v=c2f13502';
-import { toast } from './ui.js?v=c2f13502';
-import * as PDisplay from './page-display.js?v=c2f13502';
-import * as PImport from './page-import.js?v=c2f13502';
-import * as PDraw from './page-draw.js?v=c2f13502';
-import * as PReset from './page-reset.js?v=c2f13502';
-import * as PBall from './page-drawball.js?v=c2f13502';
-import { startTour, startChapter, maybeAutoStart } from './tour.js?v=c2f13502';
+import { openStore, firebaseReady } from '../store.js?v=2628f905';
+import { DB_ROOT } from '../firebase-config.js?v=2628f905';
+import { startStars } from '../bg.js?v=2628f905';
+import { S, loadAll, watchRemote, onChange } from './state.js?v=2628f905';
+import { regStats } from '../importer.js?v=2628f905';
+import { teamCount, analyze, allMatches } from '../bracket.js?v=2628f905';
+import { esc } from '../util.js?v=2628f905';
+import { toast } from './ui.js?v=2628f905';
+import * as PDisplay from './page-display.js?v=2628f905';
+import * as PImport from './page-import.js?v=2628f905';
+import * as PDraw from './page-draw.js?v=2628f905';
+import * as PReset from './page-reset.js?v=2628f905';
+import * as PBall from './page-drawball.js?v=2628f905';
+import * as PPlayers from './page-players.js?v=2628f905';
+import { startTour, startChapter, maybeAutoStart } from './tour.js?v=2628f905';
 
 const PAGES = {
   display: { title: '顯示屏設定', mod: PDisplay, icon: '🖥️', sub: '看板・比分・外觀' },
   import: { title: '表單匯入', mod: PImport, icon: '📋', sub: '報名資料' },
   draw: { title: '選手抽籤', mod: PDraw, icon: '🎲', sub: '組隊・抽籤・公布' },
+  players: { title: '選手列表', mod: PPlayers, icon: '👥', sub: '名稱・ID・Discord' },
   reset: { title: '重置', mod: PReset, icon: '♻️', sub: '清空・還原' },
   drawball: { title: '抽籤球畫面', mod: PBall, hidden: true }, // 全螢幕，不放在左邊選單
 };
@@ -167,6 +169,10 @@ function navStatus(k) {
     const inc = S.teams.filter((t) => t.include).length;
     return { t: inc ? `已組成 ${inc} 隊` : '還沒組隊' };
   }
+  if (k === 'players') {
+    const n = S.regs.filter((r) => !r.excluded).reduce((a, r) => a + r.players.length, 0);
+    return { t: n ? `${n} 位選手` : '還沒有選手' };
+  }
   if (k === 'display') {
     const m = { flow: ['比賽進行中', 'live'], result: ['比賽進行中', 'live'], custom: ['自訂公告中', 'warn'], draw: ['抽籤畫面', 'live'] }[(S.banner || {}).mode];
     return m ? { t: m[0], cls: m[1] } : { t: '看板待機中' };
@@ -230,11 +236,13 @@ function renderHome(main) {
         <a href="#display">顯示屏設定</a>
         <a href="#import">表單匯入</a>
         <a href="#draw">選手抽籤</a>
+        <a href="#players">選手列表</a>
         <a href="#reset">重置</a>
         <a href="index.html">回到前台</a>
       </div>
       <div class="home-col">
         <p><b>選手抽籤</b>　從現有的所有隊伍抽籤分隊；1 人、2 人報名的選手隨機媒合成 3 人一隊，再抽進賽程表，自動處理輪空。</p>
+        <p><b>選手列表</b>　所有選手的遊戲暱稱、遊戲 ID、Discord 與隊伍一次列出，可以搜尋、篩選、匯出 CSV。</p>
         <p><b>重置</b>　清空所有選手資料，前台的選手資料也會一起消失；誤按的話可以按「返回」復原。</p>
       </div>
     </div>

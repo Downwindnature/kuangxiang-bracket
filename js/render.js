@@ -1,7 +1,7 @@
 // render.js — 把賽程畫成 DOM（前台顯示屏與後台預覽共用）
-import { analyze, THIRD } from './bracket.js?v=c2f13502';
-import { layoutBracket } from './layout.js?v=c2f13502';
-import { esc, textWidth, FONT_STACK } from './util.js?v=c2f13502';
+import { analyze, THIRD } from './bracket.js?v=2628f905';
+import { layoutBracket } from './layout.js?v=2628f905';
+import { esc, textWidth, FONT_STACK } from './util.js?v=2628f905';
 
 const NAME_FONT_PX = 18;
 const SCORE_W = 38;

@@ -1,8 +1,8 @@
 // admin/page-import.js — 表單匯入：Excel／CSV、Google 表單同步、手動新增、統計與完整資料表
-import { S, saveRegs, saveSync, saveRoster, snapshot, emit } from './state.js?v=c2f13502';
-import * as I from '../importer.js?v=c2f13502';
-import { esc, fmtDateTime, uid } from '../util.js?v=c2f13502';
-import { toast, modal, confirmDlg, busy, pageHead } from './ui.js?v=c2f13502';
+import { S, saveRegs, saveSync, saveRoster, snapshot, emit } from './state.js?v=2628f905';
+import * as I from '../importer.js?v=2628f905';
+import { esc, fmtDateTime, uid } from '../util.js?v=2628f905';
+import { toast, modal, confirmDlg, busy, pageHead } from './ui.js?v=2628f905';
 
 const XLSX_URL = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs';
 let XLSX = null;
@@ -353,7 +353,7 @@ function openSyncSettings(main) {
 }
 
 // ── 手動新增／編輯 ──
-function openRegDialog(reg, after) {
+export function openRegDialog(reg, after) {
   const isNew = !reg;
   const r = reg ? JSON.parse(JSON.stringify(reg)) : { id: 'm_' + uid(), src: 'manual', ts: new Date().toISOString(), type: 3, teamName: '', capIdx: 0, players: [], contact: '', discord: '', dc: '', friend: '', agree: '', note: '', raw: {} };
   const box = document.createElement('div');
