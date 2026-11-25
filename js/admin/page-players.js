@@ -1,13 +1,13 @@
 // admin/page-players.js — 選手列表：每位選手的遊戲名稱、遊戲 ID、Discord、所屬隊伍
 // 點選手 → 選手資料（每一項都可以直接修改、複製；也可以打開完整的報名資料）。右上角「⚙ 設定」裡有進階功能，預設關閉；
 // 開啟後每位選手資料裡才會多一個「⚙ 設定」，列表本身看起來完全一樣。
-import { S, rm, emit, saveRegs, saveTeams } from './state.js?v=108fb9d5';
-import { toast, modal, confirmDlg, pageHead } from './ui.js?v=108fb9d5';
-import { esc } from '../util.js?v=108fb9d5';
-import { teamLabel, swapMembers } from '../matcher.js?v=108fb9d5';
-import * as I from '../importer.js?v=108fb9d5';
-import { openRegDialog } from './page-import.js?v=108fb9d5';
-import * as P from './power.js?v=108fb9d5';
+import { S, rm, emit, saveRegs, saveTeams } from './state.js?v=f641a603';
+import { toast, modal, confirmDlg, pageHead } from './ui.js?v=f641a603';
+import { esc } from '../util.js?v=f641a603';
+import { teamLabel, swapMembers } from '../matcher.js?v=f641a603';
+import * as I from '../importer.js?v=f641a603';
+import { openRegDialog } from './page-import.js?v=f641a603';
+import * as P from './power.js?v=f641a603';
 
 const COLS = [['nick', '遊戲名稱'], ['gid', '遊戲 ID'], ['discord', 'Discord'], ['team', '所屬隊伍']];
 const dim = (t) => `<span class="dim">${t}</span>`;
@@ -412,7 +412,12 @@ function openPlayer(main, x0) {
     title: '選手資料',
     body: box,
     buttons: [
-      { label: '完整報名資料', cls: 'ghost', onClick: (close) => { close(); openRegDialog(x.r, () => render(main)); } },
+      { label: '完整報名資料', cls: 'ghost', onClick: (close) => {
+        close();
+        const reg = S.regs.find((y) => y.id === x.r.id) || x.r;
+        // 儲存、返回都回到這位選手的資料（存檔後如果這位選手已經不在列表裡，例如改成不列入，就停在列表）
+        openRegDialog(reg, () => render(main), { back: () => { const y = allRows().find((z) => rowKey(z) === key); if (y) openPlayer(main, y); } });
+      } },
       { label: '關閉', cls: 'primary' },
     ],
   });

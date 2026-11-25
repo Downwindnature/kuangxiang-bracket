@@ -1,5 +1,5 @@
 // admin/ui.js — 對話框、提示訊息
-import { esc } from '../util.js?v=108fb9d5';
+import { esc } from '../util.js?v=f641a603';
 
 export function toast(msg, { type = 'ok', ms = 3600, action = null } = {}) {
   const root = document.getElementById('toasts');
@@ -58,7 +58,7 @@ export function modal({ title = '', body = '', wide = false, buttons = [{ label:
     };
     foot.appendChild(btn);
   }
-  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const onKey = (e) => { if (e.key === 'Escape' && root.lastElementChild === mask) close(); }; // 疊了好幾個視窗時只關最上面那個
   document.addEventListener('keydown', onKey);
   mask.addEventListener('mousedown', (e) => { if (e.target === mask) close(); });
   root.appendChild(mask);

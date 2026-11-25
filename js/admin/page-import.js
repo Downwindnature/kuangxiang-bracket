@@ -1,8 +1,8 @@
 // admin/page-import.js — 表單匯入：Excel／CSV、Google 表單同步、手動新增、統計與完整資料表
-import { S, saveRegs, saveSync, saveRoster, snapshot, emit } from './state.js?v=108fb9d5';
-import * as I from '../importer.js?v=108fb9d5';
-import { esc, fmtDateTime, uid } from '../util.js?v=108fb9d5';
-import { toast, modal, confirmDlg, busy, pageHead } from './ui.js?v=108fb9d5';
+import { S, saveRegs, saveSync, saveRoster, snapshot, emit } from './state.js?v=f641a603';
+import * as I from '../importer.js?v=f641a603';
+import { esc, fmtDateTime, uid } from '../util.js?v=f641a603';
+import { toast, modal, confirmDlg, busy, pageHead } from './ui.js?v=f641a603';
 
 const XLSX_URL = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs';
 let XLSX = null;
@@ -353,7 +353,8 @@ function openSyncSettings(main) {
 }
 
 // ── 手動新增／編輯 ──
-export function openRegDialog(reg, after) {
+// back：從「選手資料」打開時傳入；關掉這個視窗（返回、儲存、Esc、點外面）都會回到選手資料，刪除除外
+export function openRegDialog(reg, after, { back = null } = {}) {
   const isNew = !reg;
   const r = reg ? JSON.parse(JSON.stringify(reg)) : { id: 'm_' + uid(), src: 'manual', ts: new Date().toISOString(), type: 3, teamName: '', capIdx: 0, players: [], contact: '', discord: '', dc: '', friend: '', agree: '', note: '', raw: {} };
   const box = document.createElement('div');
@@ -390,15 +391,18 @@ export function openRegDialog(reg, after) {
   };
   draw();
   const buttons = [];
+  let deleted = false;
+  if (back) buttons.push({ label: '← 返回選手資料', cls: 'ghost push-left' });
   if (!isNew) buttons.push({ label: '刪除', cls: 'danger', onClick: async () => {
     if (!(await confirmDlg('刪除這筆報名？如果他已經被分進隊伍，那個位置會變成空位。', { danger: true, ok: '刪除' }))) return false;
+    deleted = true;
     S.regs = S.regs.filter((x) => x.id !== r.id);
     await saveRegs();
     emit('regs');
     toast('已刪除');
     after && after();
   } });
-  buttons.push({ label: '取消', cls: 'ghost' });
+  if (!back) buttons.push({ label: '取消', cls: 'ghost' });
   buttons.push({ label: '儲存', cls: 'primary', onClick: async () => {
     collect();
     if (r.players.every((p) => !p.nick && !p.gid)) { toast('至少要填一位選手', { type: 'warn' }); return false; }
@@ -409,7 +413,7 @@ export function openRegDialog(reg, after) {
     toast(isNew ? '已新增報名' : '已儲存');
     after && after();
   } });
-  modal({ title: isNew ? '手動新增報名' : '編輯報名資料', body: box, wide: true, buttons });
+  modal({ title: isNew ? '手動新增報名' : '編輯報名資料', body: box, wide: true, buttons, onClose: back ? () => { if (!deleted) back(); } : null });
 }
 
 function exportCsv() {

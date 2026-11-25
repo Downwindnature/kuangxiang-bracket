@@ -1,7 +1,7 @@
 // admin/tour.js — 使用教學：一步一步帶你看過後台
 // 第一次進後台會自動開始；左邊選單的「使用教學」可以從頭再看，每頁標題旁的「？這頁怎麼用」只看那一頁。
 // 教學只會換頁、切換分頁標籤、捲動畫面，不會按任何會改資料的按鈕。
-import { toast } from './ui.js?v=108fb9d5';
+import { toast } from './ui.js?v=f641a603';
 
 const DONE_KEY = 'kxb-tour-done';
 const VERSION = '1';

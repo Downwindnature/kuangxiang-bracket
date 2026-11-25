@@ -272,6 +272,7 @@ details summary { cursor: pointer; color: var(--ink-2); margin: 8px 0; }
 .dlg h3 { margin: 0 0 12px; }
 .dlg label { margin: 6px 0; }
 .dlg .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.dlg .foot .push-left { margin-right: auto; }
 #toasts { position: fixed; right: 18px; bottom: 18px; z-index: 200; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
 .toast { display: flex; align-items: center; gap: 12px; max-width: 520px; padding: 10px 14px; border-radius: 10px; background: #2a1a7a; border: 1px solid rgba(170, 150, 255, .6); box-shadow: 0 8px 24px rgba(0, 0, 0, .4); transition: opacity .35s, transform .35s; }
 .toast.err { background: #5a1430; border-color: #ff8aa4; }

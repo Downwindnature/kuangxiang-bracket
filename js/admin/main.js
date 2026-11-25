@@ -1,19 +1,19 @@
 // admin/main.js — 後台入口：Firebase 登入 → 選單（顯示屏設定／表單匯入／選手抽籤／重置／回到前台）
-import { openStore, firebaseReady } from '../store.js?v=108fb9d5';
-import { DB_ROOT } from '../firebase-config.js?v=108fb9d5';
-import { startStars } from '../bg.js?v=108fb9d5';
-import { S, loadAll, watchRemote, onChange } from './state.js?v=108fb9d5';
-import { regStats } from '../importer.js?v=108fb9d5';
-import { teamCount, analyze, allMatches } from '../bracket.js?v=108fb9d5';
-import { esc } from '../util.js?v=108fb9d5';
-import { toast } from './ui.js?v=108fb9d5';
-import * as PDisplay from './page-display.js?v=108fb9d5';
-import * as PImport from './page-import.js?v=108fb9d5';
-import * as PDraw from './page-draw.js?v=108fb9d5';
-import * as PReset from './page-reset.js?v=108fb9d5';
-import * as PBall from './page-drawball.js?v=108fb9d5';
-import * as PPlayers from './page-players.js?v=108fb9d5';
-import { startTour, startChapter, maybeAutoStart } from './tour.js?v=108fb9d5';
+import { openStore, firebaseReady } from '../store.js?v=f641a603';
+import { DB_ROOT } from '../firebase-config.js?v=f641a603';
+import { startStars } from '../bg.js?v=f641a603';
+import { S, loadAll, watchRemote, onChange } from './state.js?v=f641a603';
+import { regStats } from '../importer.js?v=f641a603';
+import { teamCount, analyze, allMatches } from '../bracket.js?v=f641a603';
+import { esc } from '../util.js?v=f641a603';
+import { toast } from './ui.js?v=f641a603';
+import * as PDisplay from './page-display.js?v=f641a603';
+import * as PImport from './page-import.js?v=f641a603';
+import * as PDraw from './page-draw.js?v=f641a603';
+import * as PReset from './page-reset.js?v=f641a603';
+import * as PBall from './page-drawball.js?v=f641a603';
+import * as PPlayers from './page-players.js?v=f641a603';
+import { startTour, startChapter, maybeAutoStart } from './tour.js?v=f641a603';
 
 const PAGES = {
   display: { title: '顯示屏設定', mod: PDisplay, icon: '🖥️', sub: '看板・比分・外觀' },

@@ -1,5 +1,5 @@
 // importer.js — 表單匯入：讀 Excel / CSV / Google 表單同步資料，整理成報名資料並統計
-import { nfkc } from './util.js?v=108fb9d5';
+import { nfkc } from './util.js?v=f641a603';
 
 export const FIELDS = [
   ['ts', '時間戳記'],
