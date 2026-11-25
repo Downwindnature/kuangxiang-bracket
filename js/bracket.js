@@ -88,7 +88,8 @@ export function clone(o) {
 }
 
 // 建立賽程（抽籤）：隊伍隨機放進結構裡的位置
-// strength(id) 有給的話（後台的平衡設定）：輪空一樣隨機抽，第一輪則盡量讓強度相近的兩隊對戰
+// strength(id) 有給的話（後台的平衡設定）：輪空的隊伍一樣隨機抽；每一隊的「第一場」盡量對上強度相近的對手
+// —— 第一輪兩兩配對看差距，輪空的隊伍則看它第一場會碰到的那一邊。符合的安排裡隨機挑，保留抽籤的隨機性。
 export function createBracket(teamIds, { mode = MODE_ODD, third = true, rng = cryptoRandom, strength = null, maxGap = 1 } = {}) {
   const ids = teamIds.filter(Boolean);
   const st = makeMask(ids.length, mode);
@@ -96,16 +97,12 @@ export function createBracket(teamIds, { mode = MODE_ODD, third = true, rng = cr
   const leaves = st.mask.map(() => '');
   const known = strength ? ids.filter((id) => isNum(strength(id))).length : 0;
   if (known >= 2) {
+    const val = strengthMap(ids, strength);
     const { pairs, solos } = firstRoundSlots(st.mask);
     const pool = shuffle(ids.slice(), rng);
     const byes = pool.splice(0, solos.length);        // 輪空：照規則隨機
-    const matches = shuffle(pairByStrength(pool, strength, maxGap, rng), rng);
-    pairs.forEach(([x, y], j) => {
-      const [a, b] = rng() < 0.5 ? matches[j] : [matches[j][1], matches[j][0]];
-      leaves[x] = a;
-      leaves[y] = b;
-    });
-    shuffle(solos, rng).forEach((x, j) => { leaves[x] = byes[j]; });
+    const matches = pairByStrength(pool, (id) => val.get(id), maxGap, rng);
+    placeFirstRound(st.mask, pairs, solos, matches, byes, val, maxGap, rng).forEach((id, i) => { if (id) leaves[i] = id; });
   } else {
     shuffle(ids, rng);
     let p = 0;
@@ -115,6 +112,17 @@ export function createBracket(teamIds, { mode = MODE_ODD, third = true, rng = cr
 }
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
+const EPS = 1e-9;
+// 超過上限的部分才算代價，而且平方：兩場各超一點，比一場超很多好
+const over = (g, G) => (g > G + EPS ? (g - G) * (g - G) : 0);
+
+// 沒有強度的隊伍當作平均值
+function strengthMap(ids, strength) {
+  const raw = ids.map((id) => strength(id));
+  const known = raw.filter(isNum);
+  const avg = known.length ? known.reduce((x, y) => x + y, 0) / known.length : 0;
+  return new Map(ids.map((id, i) => [id, isNum(raw[i]) ? raw[i] : avg]));
+}
 
 // 第一輪的位置：兩格都有隊伍 = 一場比賽；只有一格 = 輪空
 export function firstRoundSlots(mask) {
@@ -127,45 +135,156 @@ export function firstRoundSlots(mask) {
   return { pairs, solos };
 }
 
-// 兩兩配對：每一對的強度差盡量不超過 maxGap，符合的對象裡隨機挑（保留抽籤的隨機性）
-// 沒有強度的隊伍當作平均值；先處理「能配的對象最少」的隊伍，失敗就重洗再試，留最好的一組
+// 兩兩配對：每一對的強度差盡量不超過 maxGap，符合的對象裡隨機挑（保留抽籤的隨機性）。
+// 做法：先處理「能配的對象最少」的隊伍，再兩對兩對互換改善；排序後相鄰配對是理論上最好的結果，
+// 隨機試到跟它一樣好就停，真的試不到才用它。
 export function pairByStrength(ids, strength, maxGap = 1, rng = cryptoRandom, tries = 0) {
-  const raw = ids.map((id) => strength(id));
-  const known = raw.filter(isNum);
-  const avg = known.length ? known.reduce((x, y) => x + y, 0) / known.length : 0;
-  const val = new Map(ids.map((id, i) => [id, isNum(raw[i]) ? raw[i] : avg]));
-  const gap = (a, b) => Math.abs(val.get(a) - val.get(b));
-  const ok = (a, b) => gap(a, b) <= maxGap + 1e-9;
   const n = ids.length;
-  const rounds = tries || (n <= 32 ? 80 : n <= 64 ? 30 : 10);
+  if (n < 2) return [];
+  const val = strengthMap(ids, strength);
+  const gap = (a, b) => Math.abs(val.get(a) - val.get(b));
+  const cost = (a, b) => over(gap(a, b), maxGap);
+  const total = (pairs) => pairs.reduce((s, [a, b]) => s + cost(a, b), 0);
+  const sorted = ids.slice().sort((a, b) => val.get(a) - val.get(b));
+  const floor = [];
+  for (let i = 0; i + 1 < n; i += 2) floor.push([sorted[i], sorted[i + 1]]);
+  const target = total(floor) + EPS;
+  const rounds = tries || (n <= 32 ? 60 : n <= 64 ? 25 : 10);
   let best = null;
   for (let t = 0; t < rounds; t++) {
-    const pool = shuffle(ids.slice(), rng);
-    const pairs = [];
-    let bad = 0, worst = 0, total = 0;
-    while (pool.length > 1) {
-      let ai = 0, least = Infinity;
-      for (let i = 0; i < pool.length; i++) {
-        let c = 0;
-        for (let j = 0; j < pool.length; j++) if (j !== i && ok(pool[i], pool[j])) c++;
-        if (c < least) { least = c; ai = i; }
-      }
-      const a = pool.splice(ai, 1)[0];
-      const cand = pool.filter((x) => ok(a, x));
-      let b;
-      if (cand.length) b = cand[Math.floor(rng() * cand.length)];
-      else { b = pool.reduce((m, x) => (gap(a, x) < gap(a, m) ? x : m), pool[0]); bad++; }
-      pool.splice(pool.indexOf(b), 1);
-      const g = gap(a, b);
-      if (g > worst) worst = g;
-      total += g;
-      pairs.push([a, b]);
-    }
-    const better = !best || bad < best.bad || (bad === best.bad && (worst < best.worst - 1e-9 || (Math.abs(worst - best.worst) < 1e-9 && total < best.total)));
-    if (better) best = { pairs, bad, worst, total };
-    if (bad === 0) break;
+    const pairs = improvePairs(greedyPairs(shuffle(ids.slice(), rng), gap, maxGap, rng), cost);
+    const c = total(pairs);
+    if (!best || c < best.c - EPS) best = { pairs, c };
+    if (best.c <= target) break;
   }
-  return best ? best.pairs : [];
+  return best.c <= target ? best.pairs : floor;
+}
+
+function greedyPairs(pool, gap, G, rng) {
+  const ok = (a, b) => gap(a, b) <= G + EPS;
+  const pairs = [];
+  while (pool.length > 1) {
+    let ai = 0, least = Infinity;
+    for (let i = 0; i < pool.length; i++) {
+      let c = 0;
+      for (let j = 0; j < pool.length; j++) if (j !== i && ok(pool[i], pool[j])) c++;
+      if (c < least) { least = c; ai = i; }
+    }
+    const a = pool.splice(ai, 1)[0];
+    const cand = pool.filter((x) => ok(a, x));
+    const b = cand.length ? cand[Math.floor(rng() * cand.length)] : pool.reduce((m, x) => (gap(a, x) < gap(a, m) ? x : m), pool[0]);
+    pool.splice(pool.indexOf(b), 1);
+    pairs.push([a, b]);
+  }
+  return pairs;
+}
+
+function improvePairs(pairs, cost) {
+  for (let guard = 0, again = true; again && guard < 40; guard++) {
+    again = false;
+    for (let i = 0; i < pairs.length; i++) {
+      for (let j = i + 1; j < pairs.length; j++) {
+        const [a, b] = pairs[i], [c, d] = pairs[j];
+        const now = cost(a, b) + cost(c, d);
+        if (now <= EPS) continue;
+        const x = cost(a, c) + cost(b, d), y = cost(a, d) + cost(b, c);
+        if (x < now - EPS && x <= y) { pairs[i] = [a, c]; pairs[j] = [b, d]; again = true; }
+        else if (y < now - EPS) { pairs[i] = [a, d]; pairs[j] = [b, c]; again = true; }
+      }
+    }
+  }
+  return pairs;
+}
+
+// 把配好的比賽和輪空隊伍放進位置：輪空隊伍第一場會碰到的那一邊（通常是旁邊某一場的勝方）也盡量強度相近。
+// 從隨機的擺法開始，只在有超過上限時才互換位置改善；回傳 leaves（每一格的隊伍 id）
+function placeFirstRound(mask, pairs, solos, matches, byes, val, G, rng) {
+  const S = mask.length;
+  const out = mask.map(() => '');
+  const put = (mAt, bAt) => {
+    pairs.forEach(([x, y], j) => {
+      const m = matches[mAt[j]];
+      const flip = rng() < 0.5;
+      out[x] = flip ? m[1] : m[0];
+      out[y] = flip ? m[0] : m[1];
+    });
+    solos.forEach((x, s) => { out[x] = byes[bAt[s]]; });
+    return out;
+  };
+  const order = (len) => shuffle(Array.from({ length: len }, (_, i) => i), rng);
+  if (!solos.length) return put(order(pairs.length), []);
+  // 每個節點底下有幾隊；每個輪空位置往上找，第一個有隊伍的另一邊 = 它第一場的對手那一邊
+  const cnt = new Array(2 * S).fill(0);
+  for (let i = 0; i < S; i++) cnt[S + i] = mask[i] ? 1 : 0;
+  for (let p = S - 1; p >= 1; p--) cnt[p] = cnt[2 * p] + cnt[2 * p + 1];
+  const pairOf = new Map(pairs.map(([x], j) => [x, j]));
+  const soloOf = new Map(solos.map((x, s) => [x, s]));
+  const opp = solos.map((x) => {
+    let node = S + x;
+    while (node > 1 && !cnt[node ^ 1]) node >>= 1;
+    if (node <= 1) return { p: [], s: [] };
+    const ref = { p: [], s: [] };
+    const walk = (q) => {
+      if (!cnt[q]) return;
+      if (q >= S) { const i = q - S; if (pairOf.has(i)) ref.p.push(pairOf.get(i)); else if (soloOf.has(i)) ref.s.push(soloOf.get(i)); return; }
+      walk(2 * q); walk(2 * q + 1);
+    };
+    walk(node ^ 1);
+    return ref;
+  });
+  const depP = pairs.map(() => []), depS = solos.map((_, s) => [s]);
+  opp.forEach((o, s) => { o.p.forEach((j) => depP[j].push(s)); o.s.forEach((t) => depS[t].push(s)); });
+  const mv = matches.map(([a, b]) => val.get(a) + val.get(b));
+  const one = (s, mAt, bAt) => {
+    const o = opp[s];
+    let sum = 0, k = 0;
+    for (const j of o.p) { sum += mv[mAt[j]]; k += 2; }
+    for (const t of o.s) { sum += val.get(byes[bAt[t]]); k += 1; }
+    return k ? over(Math.abs(val.get(byes[bAt[s]]) - sum / k), G) : 0;
+  };
+  const some = (list, mAt, bAt) => { let c = 0; for (const s of new Set(list)) c += one(s, mAt, bAt); return c; };
+  const all = (mAt, bAt) => solos.reduce((c, _, s) => c + one(s, mAt, bAt), 0);
+  const tryPairs = (mAt, bAt) => {
+    let gain = false;
+    for (let a = 0; a < mAt.length; a++) {
+      for (let b = a + 1; b < mAt.length; b++) {
+        const dep = depP[a].concat(depP[b]);
+        if (!dep.length) continue;
+        const before = some(dep, mAt, bAt);
+        if (before <= EPS) continue;
+        [mAt[a], mAt[b]] = [mAt[b], mAt[a]];
+        if (some(dep, mAt, bAt) < before - EPS) gain = true; else [mAt[a], mAt[b]] = [mAt[b], mAt[a]];
+      }
+    }
+    return gain;
+  };
+  const trySolos = (mAt, bAt) => {
+    let gain = false;
+    for (let a = 0; a < bAt.length; a++) {
+      for (let b = a + 1; b < bAt.length; b++) {
+        const dep = depS[a].concat(depS[b]);
+        const before = some(dep, mAt, bAt);
+        if (before <= EPS) continue;
+        [bAt[a], bAt[b]] = [bAt[b], bAt[a]];
+        if (some(dep, mAt, bAt) < before - EPS) gain = true; else [bAt[a], bAt[b]] = [bAt[b], bAt[a]];
+      }
+    }
+    return gain;
+  };
+  let best = null;
+  const restarts = solos.length + pairs.length <= 40 ? 12 : 5;
+  for (let r = 0; r < restarts; r++) {
+    const mAt = order(pairs.length), bAt = order(solos.length);
+    for (let guard = 0; guard < 30 && all(mAt, bAt) > EPS; guard++) {
+      const g1 = tryPairs(mAt, bAt);
+      const g2 = trySolos(mAt, bAt);
+      if (!g1 && !g2) break;
+    }
+    const c = all(mAt, bAt);
+    if (!best || c < best.c - EPS) best = { mAt, bAt, c };
+    if (best.c <= EPS) break;
+  }
+  return put(best.mAt, best.bAt);
 }
 
 const isTeam = (x) => typeof x === 'string' && x !== '' && x !== '?';

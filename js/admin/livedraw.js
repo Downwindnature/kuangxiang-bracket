@@ -1,8 +1,8 @@
 // admin/livedraw.js — 直播抽籤的共用動作（「選手抽籤 ③」與全螢幕抽籤球畫面共用）
-import { S, saveDraw, saveSettings, snapshot, emit, teamNames } from './state.js?v=2628f905';
-import { revealSteps, revealPending, teamCount, hasResults, clearAllResults } from '../bracket.js?v=2628f905';
-import { withDefaults, drawTiming, DRAW_FX } from '../banner.js?v=2628f905';
-import { toast, confirmDlg } from './ui.js?v=2628f905';
+import { S, saveDraw, saveSettings, snapshot, emit, teamNames } from './state.js?v=7ec8e333';
+import { revealSteps, revealPending, teamCount, hasResults, clearAllResults } from '../bracket.js?v=7ec8e333';
+import { withDefaults, drawTiming, DRAW_FX } from '../banner.js?v=7ec8e333';
+import { toast, confirmDlg } from './ui.js?v=7ec8e333';
 
 const FX_KEY = 'kxb-drawfx';
 export const numIn = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };

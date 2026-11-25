@@ -1,6 +1,6 @@
 // banner.js — 頂端固定顯示屏（通知看板）：VS → 正在比賽中 → 下一場請準備 …，所有時間與文字都可在後台設定
-import { analyze, getNode, nextMatch, matchTitle } from './bracket.js?v=2628f905';
-import { esc, renderTpl } from './util.js?v=2628f905';
+import { analyze, getNode, nextMatch, matchTitle } from './bracket.js?v=7ec8e333';
+import { esc, renderTpl } from './util.js?v=7ec8e333';
 
 export const BANNER_DEFAULTS = {
   mode: 'idle',        // idle 待機 / flow 對戰流程 / result 結果公告 / custom 自訂公告 / draw 抽籤

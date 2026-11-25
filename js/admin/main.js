@@ -1,19 +1,19 @@
 // admin/main.js — 後台入口：Firebase 登入 → 選單（顯示屏設定／表單匯入／選手抽籤／重置／回到前台）
-import { openStore, firebaseReady } from '../store.js?v=2628f905';
-import { DB_ROOT } from '../firebase-config.js?v=2628f905';
-import { startStars } from '../bg.js?v=2628f905';
-import { S, loadAll, watchRemote, onChange } from './state.js?v=2628f905';
-import { regStats } from '../importer.js?v=2628f905';
-import { teamCount, analyze, allMatches } from '../bracket.js?v=2628f905';
-import { esc } from '../util.js?v=2628f905';
-import { toast } from './ui.js?v=2628f905';
-import * as PDisplay from './page-display.js?v=2628f905';
-import * as PImport from './page-import.js?v=2628f905';
-import * as PDraw from './page-draw.js?v=2628f905';
-import * as PReset from './page-reset.js?v=2628f905';
-import * as PBall from './page-drawball.js?v=2628f905';
-import * as PPlayers from './page-players.js?v=2628f905';
-import { startTour, startChapter, maybeAutoStart } from './tour.js?v=2628f905';
+import { openStore, firebaseReady } from '../store.js?v=7ec8e333';
+import { DB_ROOT } from '../firebase-config.js?v=7ec8e333';
+import { startStars } from '../bg.js?v=7ec8e333';
+import { S, loadAll, watchRemote, onChange } from './state.js?v=7ec8e333';
+import { regStats } from '../importer.js?v=7ec8e333';
+import { teamCount, analyze, allMatches } from '../bracket.js?v=7ec8e333';
+import { esc } from '../util.js?v=7ec8e333';
+import { toast } from './ui.js?v=7ec8e333';
+import * as PDisplay from './page-display.js?v=7ec8e333';
+import * as PImport from './page-import.js?v=7ec8e333';
+import * as PDraw from './page-draw.js?v=7ec8e333';
+import * as PReset from './page-reset.js?v=7ec8e333';
+import * as PBall from './page-drawball.js?v=7ec8e333';
+import * as PPlayers from './page-players.js?v=7ec8e333';
+import { startTour, startChapter, maybeAutoStart } from './tour.js?v=7ec8e333';
 
 const PAGES = {
   display: { title: '顯示屏設定', mod: PDisplay, icon: '🖥️', sub: '看板・比分・外觀' },
@@ -242,7 +242,7 @@ function renderHome(main) {
       </div>
       <div class="home-col">
         <p><b>選手抽籤</b>　從現有的所有隊伍抽籤分隊；1 人、2 人報名的選手隨機媒合成 3 人一隊，再抽進賽程表，自動處理輪空。</p>
-        <p><b>選手列表</b>　所有選手的遊戲暱稱、遊戲 ID、Discord 與隊伍一次列出，可以搜尋、篩選、匯出 CSV。</p>
+        <p><b>選手列表</b>　每位選手的遊戲名稱、遊戲 ID、Discord 與所屬隊伍；點選手可以看他的資料。</p>
         <p><b>重置</b>　清空所有選手資料，前台的選手資料也會一起消失；誤按的話可以按「返回」復原。</p>
       </div>
     </div>

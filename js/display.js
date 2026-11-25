@@ -1,12 +1,12 @@
 // display.js — 前台顯示屏
-import { openStore } from './store.js?v=2628f905';
-import { renderBracket } from './render.js?v=2628f905';
-import { withDefaults, drawTiming } from './banner.js?v=2628f905';
-import { createBannerUI } from './bannerui.js?v=2628f905';
-import { parseJSON, esc } from './util.js?v=2628f905';
-import { createBracket, setResult, analyze, nextMatch, publicView, autoTimes, revealSteps, MODE_ODD, MODE_POW2, THIRD } from './bracket.js?v=2628f905';
-import { startStars } from './bg.js?v=2628f905';
-import { createDrawFx, drawMask } from './drawfx.js?v=2628f905';
+import { openStore } from './store.js?v=7ec8e333';
+import { renderBracket } from './render.js?v=7ec8e333';
+import { withDefaults, drawTiming } from './banner.js?v=7ec8e333';
+import { createBannerUI } from './bannerui.js?v=7ec8e333';
+import { parseJSON, esc } from './util.js?v=7ec8e333';
+import { createBracket, setResult, analyze, nextMatch, publicView, autoTimes, revealSteps, MODE_ODD, MODE_POW2, THIRD } from './bracket.js?v=7ec8e333';
+import { startStars } from './bg.js?v=7ec8e333';
+import { createDrawFx, drawMask } from './drawfx.js?v=7ec8e333';
 
 const q = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);

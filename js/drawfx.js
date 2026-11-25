@@ -1,8 +1,8 @@
 // drawfx.js — 前台「抽籤球」動畫：抽獎球裡一堆球滾動 → 跑出兩顆球（抽到一起的兩隊）→ 停留 → 飛進賽程表
 // 時間軸以伺服器時間（看板的 draw.at）為準，所以中途打開或重新整理前台也會接在正確的位置。
-import { drawTiming } from './banner.js?v=2628f905';
-import { Drum, BALL_COLORS, MAX_DRUM_BALLS } from './drum.js?v=2628f905';
-import { FONT_STACK } from './util.js?v=2628f905';
+import { drawTiming } from './banner.js?v=7ec8e333';
+import { Drum, BALL_COLORS, MAX_DRUM_BALLS } from './drum.js?v=7ec8e333';
+import { FONT_STACK } from './util.js?v=7ec8e333';
 
 // 版面（舞台 1920×1080 座標）；前台的預設位置，後台抽籤球畫面會傳入自己的 geom
 const DEFAULT_GEOM = {

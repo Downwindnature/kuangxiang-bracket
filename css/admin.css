@@ -281,7 +281,7 @@ details summary { cursor: pointer; color: var(--ink-2); margin: 8px 0; }
 .toast button { padding: 4px 10px; }
 
 @media (max-width: 900px) {
-  .shell { grid-template-columns: 1fr; }
+  .shell { grid-template-columns: minmax(0, 1fr); }
   .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid rgba(150, 120, 255, .2); }
   .nav-main { flex-direction: row; flex-wrap: wrap; flex: 1 1 100%; }
   .side a, .side .nav-help { flex: 1; min-width: 150px; width: auto; }
@@ -344,16 +344,38 @@ kbd { display: inline-block; min-width: 1.6em; padding: 0 5px; border-radius: 5p
 .inline-sel { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; white-space: nowrap; }
 .tbl.players td { vertical-align: middle; }
 .tbl.players td.nick { font-weight: 700; white-space: nowrap; }
-.tbl.players td.gid { font-size: 13px; }
-.tbl.players tr.band1 td { background: rgba(70, 50, 160, .12); }
-.tbl.players tr.g-start td { border-top: 1px solid rgba(170, 150, 255, .35); }
+.tbl.players td.gid { font-size: 13px; letter-spacing: .3px; }
 .tbl.players tbody tr { cursor: pointer; }
-.tbl.players td.pw select { min-width: 110px; padding: 4px 6px; }
-.pw-avg { display: inline-block; margin-left: 4px; padding: 0 7px; border-radius: 999px; font-size: 12px; color: #ffe3a8; background: rgba(255, 190, 80, .14); border: 1px solid rgba(255, 190, 80, .4); }
+.tbl.players tbody tr:hover td { background: rgba(110, 85, 230, .16); }
+.tbl.players th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.tbl.players th.sortable:hover { color: var(--ink); }
+.tbl.players th .arr { font-style: normal; font-size: 10px; margin-left: 5px; color: #b9a8ff; }
+button.mini { padding: 2px 9px; font-size: 12px; font-weight: 600; border-radius: 7px; margin-left: 8px; vertical-align: 1px; }
+/* 選手資料 */
+.pl-info dl { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 12px 14px; margin: 2px 0 0; align-items: baseline; }
+.pl-info dt { color: var(--ink-3); font-size: 13px; }
+.pl-info dd { margin: 0; word-break: break-all; }
+.pl-info dd.name { font-size: 19px; font-weight: 800; }
+.pl-info .gid { letter-spacing: .5px; }
+.pl-info dd .hint { margin-top: 4px; }
+.pi-more { margin-top: 18px; padding-top: 12px; border-top: 1px solid rgba(150, 130, 255, .2); }
+.pi-more #piSetBtn.on { background: rgba(110, 85, 230, .35); }
+.pi-set { margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: rgba(70, 50, 160, .16); border: 1px solid rgba(150, 130, 255, .25); }
+.pi-set[hidden] { display: none; }
+.pi-set h4 { margin: 0 0 10px; font-size: 15px; }
+.pw-row { display: flex; gap: 14px; align-items: center; }
+.pw-row input[type=range] { flex: 1; accent-color: #8f72ff; padding: 0; border: 0; background: none; }
+.pw-row input[type=number] { width: 92px; text-align: center; font-size: 17px; font-weight: 700; }
+/* 選手列表設定 */
 .pl-set h4 { margin: 16px 0 6px; font-size: 15px; }
-.pl-set .chk.big { font-size: 16px; font-weight: 800; }
 .pl-set textarea { width: 100%; }
-.pl-set .pw-panel[hidden] { display: none; }
-.pw-first { margin: 10px 0 0; }
-.pw-first summary { cursor: pointer; color: var(--ink-2); }
-.tbl tr.warnrow td { background: rgba(255, 170, 40, .12); }
+.pl-set details.fold { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(150, 130, 255, .2); }
+.pl-set details.fold > summary h3 { font-size: 15px; }
+.pl-set .pw-count { margin: 10px 0 0; }
+label.switch-row { flex-direction: row; align-items: center; gap: 12px; font-size: 16px; color: var(--ink); margin: 2px 0 10px; cursor: pointer; position: relative; }
+label.switch-row input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+label.switch-row .sw { flex: none; position: relative; width: 46px; height: 26px; border-radius: 999px; background: rgba(255, 255, 255, .16); border: 1px solid rgba(165, 145, 255, .45); transition: background .15s; }
+label.switch-row .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .15s; }
+label.switch-row input:checked + .sw { background: linear-gradient(180deg, #7d5eff, #5034d6); border-color: #b9a8ff; }
+label.switch-row input:checked + .sw::after { transform: translateX(20px); }
+label.switch-row input:focus-visible + .sw { outline: 2px solid rgba(140, 200, 255, .8); outline-offset: 2px; }

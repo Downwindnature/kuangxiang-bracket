@@ -1,94 +1,99 @@
-// admin/power.js — 選手列表「設定」裡的進階功能：每位選手的戰力等級
-// 只存在後台的私人資料區（private/power），只有選手列表的設定裡看得到；
-// 選手抽籤頁只會默默套用（媒合、抽籤），畫面上不會出現任何相關字眼。
-import { S, savePower } from './state.js?v=2628f905';
+// admin/power.js — 選手列表「⚙ 設定」裡的進階功能：每位選手 0～100 的數值（越高越強）
+// 只存在後台的私人資料區（private/power）。預設關閉：關閉時媒合與抽籤完全照原本的隨機方式。
+// 開啟後也只有「選手列表 ⚙ 設定」和每位選手資料裡的「⚙ 設定」看得到；其他頁面只會默默套用，不顯示任何數字或字眼。
+import { S, savePower } from './state.js?v=7ec8e333';
 
-export const TIERS = [
-  { v: 1, name: '基本' },
-  { v: 2, name: '初階' },
-  { v: 3, name: '中階' },
-  { v: 4, name: '中高階' },
-  { v: 5, name: '高階' },
-  { v: 6, name: '巔峰' },
-];
-export const GAPS = [0.5, 1, 1.5, 2];
-export const POWER_DEFAULTS = { draw: true, gap: 1, match: false };
+export const MAX = 100;
+export const BASE_VALUE = 50;              // 沒有設定的選手當作 50
+export const GAPS = [5, 10, 15, 20, 30];   // 第一場兩邊的差距上限（分）
+export const OPT_DEFAULTS = { gap: 10, match: true };
 
-export const tierName = (v) => (TIERS.find((t) => t.v === v) || {}).name || '';
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
+const clamp = (x) => Math.max(0, Math.min(MAX, Math.round(x)));
+const half = (s) => String(s).replace(/[０-９．]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+
+// 存進來的資料整理成目前的格式；舊版的 1～6 等級換算成 0～100（0、20、40、60、80、100），舊資料一律先維持關閉
+export function normalizePower(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const old = src.scale !== MAX;
+  const v = {};
+  for (const [k, x] of Object.entries(src.v && typeof src.v === 'object' ? src.v : {})) {
+    let n = Number(x);
+    if (!Number.isFinite(n)) continue;
+    if (old) { if (n < 1 || n > 6) continue; n = (n - 1) * 20; }
+    v[k] = clamp(n);
+  }
+  const o = !old && src.opt && typeof src.opt === 'object' ? src.opt : {};
+  return {
+    scale: MAX,
+    on: !old && src.on === true,
+    v,
+    opt: { gap: GAPS.includes(Number(o.gap)) ? Number(o.gap) : OPT_DEFAULTS.gap, match: o.match !== false },
+    at: Number(src.at) || 0,
+  };
+}
 
 export function powerData() {
-  if (!S.power || typeof S.power !== 'object') S.power = { v: {}, opt: {} };
-  if (!S.power.v || typeof S.power.v !== 'object') S.power.v = {};
-  if (!S.power.opt || typeof S.power.opt !== 'object') S.power.opt = {};
+  const d = S.power;
+  if (!d || typeof d !== 'object' || d.scale !== MAX || !d.v || typeof d.v !== 'object' || !d.opt || typeof d.opt !== 'object') S.power = normalizePower(d);
   return S.power;
 }
 
-export const powerOpts = () => Object.assign({}, POWER_DEFAULTS, (S.power && S.power.opt) || {});
+export const isOn = () => powerData().on === true;
+export const powerOpts = () => Object.assign({}, OPT_DEFAULTS, powerData().opt);
 
 // 以遊戲 ID 記（重新同步表單也不會掉）；沒有 ID 的才用暱稱
 export const powerKey = (p) => (p && p.gid ? String(p.gid) : p && p.nick ? `n:${String(p.nick).trim()}` : '');
 
 export function playerPower(p) {
   const k = powerKey(p);
-  const v = k && S.power && S.power.v ? S.power.v[k] : null;
-  return isNum(v) ? v : null;
+  const x = k ? powerData().v[k] : undefined;
+  return isNum(x) ? clamp(x) : null;
 }
 
-export async function setPlayerPower(p, v) {
+const touch = async (d) => { d.at = Date.now(); await savePower(); };
+
+export async function setPlayerPower(p, x) {
   const k = powerKey(p);
   if (!k) return false;
   const d = powerData();
-  if (isNum(v) && v >= 1 && v <= 6) d.v[k] = v;
-  else delete d.v[k];
-  d.at = Date.now();
-  await savePower();
+  if (isNum(x)) d.v[k] = clamp(x); else delete d.v[k];
+  await touch(d);
   return true;
+}
+
+export async function setOn(on) {
+  const d = powerData();
+  d.on = !!on;
+  await touch(d);
 }
 
 export async function setPowerOpts(patch) {
   const d = powerData();
-  d.opt = Object.assign({}, powerOpts(), patch);
-  d.at = Date.now();
-  await savePower();
+  d.opt = Object.assign(powerOpts(), patch);
+  await touch(d);
 }
 
 export async function clearAllPower() {
   const d = powerData();
   d.v = {};
-  d.at = Date.now();
-  await savePower();
+  await touch(d);
 }
 
-export const hasAnyPower = () => !!(S.power && S.power.v && Object.values(S.power.v).some(isNum));
+export const hasAnyPower = () => Object.values(powerData().v).some(isNum);
+export const countSet = (players) => players.filter((p) => playerPower(p) != null).length;
 
-// 隊伍：隊員平均（沒設定的隊員不算；整隊都沒設定 = null）
-export function teamPower(t, regMapObj) {
-  if (!t) return null;
-  const vals = [];
-  for (const ref of t.members) {
-    const r = regMapObj[ref.r];
-    const p = r && r.players[ref.i];
-    const v = p ? playerPower(p) : null;
-    if (isNum(v)) vals.push(v);
-  }
-  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-}
-
-export const fmtPower = (v) => (isNum(v) ? (Math.round(v * 10) / 10).toFixed(v % 1 ? 1 : 0) : '—');
-
-// 「1」～「6」或等級名稱；0、-、清除 = 清除
-export function parseTier(s) {
-  const t = String(s == null ? '' : s).trim();
+// 「0」～「100」（可以有「分」、全形數字）；「-」「清除」= 清除；其他 = 看不懂（undefined）
+export function parseValue(s) {
+  const t = half(String(s == null ? '' : s).trim()).replace(/分$/, '');
   if (!t) return undefined;
-  if (/^(0|-|—|清除|無|未設定)$/.test(t)) return null;
+  if (/^(-|—|清除|無|未設定)$/.test(t)) return null;
+  if (!/^\d+(\.\d+)?$/.test(t)) return undefined;
   const n = Number(t);
-  if (Number.isInteger(n) && n >= 1 && n <= 6) return n;
-  const hit = TIERS.find((x) => x.name === t || x.name === `${t}階` || x.name.replace('階', '') === t);
-  return hit ? hit.v : undefined;
+  return n >= 0 && n <= MAX ? clamp(n) : undefined;
 }
 
-// 一次貼上：每行「遊戲 ID（或暱稱） 等級」
+// 一次貼上：每行「遊戲 ID（或暱稱） 數字」
 export async function bulkApply(text, players) {
   const byGid = new Map();
   const byNick = new Map();
@@ -105,29 +110,37 @@ export async function bulkApply(text, players) {
     if (!l) continue;
     const parts = l.split(/[\t,，:：]+|\s+/).filter(Boolean);
     if (parts.length < 2) { bad.push(l); continue; }
-    const v = parseTier(parts[parts.length - 1]);
-    if (v === undefined) { bad.push(l); continue; }
+    const x = parseValue(parts[parts.length - 1]);
+    if (x === undefined) { bad.push(l); continue; }
     const who = parts.slice(0, -1).join(' ');
-    const digits = who.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/\s+/g, '');
-    const p = byGid.get(digits) || byNick.get(who.toLowerCase());
+    const p = byGid.get(half(who).replace(/\s+/g, '')) || byNick.get(who.toLowerCase());
     if (!p) { miss.push(who); continue; }
     const k = powerKey(p);
-    if (v == null) delete d.v[k]; else d.v[k] = v;
+    if (x == null) delete d.v[k]; else d.v[k] = x;
     ok++;
   }
-  if (ok) { d.at = Date.now(); await savePower(); }
+  if (ok) await touch(d);
   return { ok, miss, bad };
 }
 
-// 給選手抽籤頁：有開啟才回傳（沒有任何文字）
+const valueOf = (p) => { const x = p ? playerPower(p) : null; return x == null ? BASE_VALUE : x; };
+
+// 一隊 = 隊員的平均（沒設定的隊員當作 50）；只在內部計算用，畫面上不顯示
+export function teamValue(t, regMapObj) {
+  if (!t || !t.members || !t.members.length) return null;
+  let sum = 0;
+  for (const ref of t.members) { const r = regMapObj[ref.r]; sum += valueOf(r && r.players[ref.i]); }
+  return sum / t.members.length;
+}
+
+// 給選手抽籤頁：有開啟、而且至少設定了一位才回傳（關閉 = 空物件 = 原本的隨機）
 export function matchOptions() {
-  const o = powerOpts();
-  if (!o.match || !hasAnyPower()) return {};
-  return { strength: (reg, i) => playerPower(reg.players[i]) };
+  if (!isOn() || !powerOpts().match || !hasAnyPower()) return {};
+  return { strength: (reg, i) => valueOf(reg.players[i]) };
 }
 
 export function drawOptions(regMapObj) {
-  const o = powerOpts();
-  if (!o.draw || !hasAnyPower()) return {};
-  return { strength: (id) => teamPower(S.teams.find((t) => t.id === id), regMapObj), maxGap: Number(o.gap) || 1 };
+  if (!isOn() || !hasAnyPower()) return {};
+  const byId = new Map(S.teams.map((t) => [t.id, t]));
+  return { strength: (id) => teamValue(byId.get(id), regMapObj), maxGap: Number(powerOpts().gap) || OPT_DEFAULTS.gap };
 }
