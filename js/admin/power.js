@@ -1,7 +1,7 @@
 // admin/power.js — 選手列表「⚙ 設定」裡的進階功能：每位選手 0～100 的數值（越高越強）
 // 只存在後台的私人資料區（private/power）。預設關閉：關閉時媒合與抽籤完全照原本的隨機方式。
 // 開啟後也只有「選手列表 ⚙ 設定」和每位選手資料裡的「⚙ 設定」看得到；其他頁面只會默默套用，不顯示任何數字或字眼。
-import { S, savePower } from './state.js?v=cd1fa29e';
+import { S, savePower } from './state.js?v=108fb9d5';
 
 export const MAX = 100;
 export const BASE_VALUE = 50;              // 沒有設定的選手當作 50
@@ -77,6 +77,20 @@ export async function setPowerOpts(patch) {
 export async function clearAllPower() {
   const d = powerData();
   d.v = {};
+  await touch(d);
+}
+
+// 選手的遊戲 ID（或沒有 ID 時的暱稱）改了：數值跟著搬到新的 ID。others = 其他所有選手（不含這位）。
+// 新的 ID 已經有別人在用（重複）時不動別人的數值，舊的也先留著，改回來就會接上；舊的 ID 沒有別人用才刪掉。
+export async function movePowerKey(oldP, newP, others) {
+  const a = powerKey(oldP), b = powerKey(newP);
+  if (!a || !b || a === b) return;
+  const d = powerData();
+  if (!isNum(d.v[a])) return;
+  const used = (k) => others.some((p) => powerKey(p) === k);
+  if (used(b)) return;
+  d.v[b] = d.v[a];
+  if (!used(a)) delete d.v[a];
   await touch(d);
 }
 

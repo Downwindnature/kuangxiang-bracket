@@ -1,10 +1,10 @@
 // admin/page-drawball.js — 全螢幕抽籤球畫面：直播抽籤時，後台整個變成抽籤球（其他部分都隱藏）
-import { S, teamNames } from './state.js?v=cd1fa29e';
-import { publicView, teamCount } from '../bracket.js?v=cd1fa29e';
-import { createBannerUI } from '../bannerui.js?v=cd1fa29e';
-import { createDrawFx, drawMask } from '../drawfx.js?v=cd1fa29e';
-import { esc } from '../util.js?v=cd1fa29e';
-import * as L from './livedraw.js?v=cd1fa29e';
+import { S, teamNames } from './state.js?v=108fb9d5';
+import { publicView, teamCount } from '../bracket.js?v=108fb9d5';
+import { createBannerUI } from '../bannerui.js?v=108fb9d5';
+import { createDrawFx, drawMask } from '../drawfx.js?v=108fb9d5';
+import { esc } from '../util.js?v=108fb9d5';
+import * as L from './livedraw.js?v=108fb9d5';
 
 // 舞台 1920×1080：抽獎球放左邊中間，右邊是「已抽出」清單
 const GEOM = { cx: 760, cy: 600, scale: 0.88, slots: [{ x: 380, y: 590 }, { x: 1140, y: 590 }], titleTop: 196 };

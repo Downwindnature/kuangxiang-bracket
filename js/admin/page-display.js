@@ -1,12 +1,12 @@
 // admin/page-display.js — 顯示屏設定：通知看板、賽程與比分、顯示內容與外觀
-import { S, saveBanner, saveSettings, saveBracket, emit, teamNames, publicTeamsPayload } from './state.js?v=cd1fa29e';
-import { analyze, allMatches, matchTitle, roundNames, setResult, clearResult, setScores, setTime, autoTimes, getNode, playOrder, publicView, teamCount } from '../bracket.js?v=cd1fa29e';
-import { withDefaults, resolveNext, liveText, extraLines, BANNER_DEFAULTS } from '../banner.js?v=cd1fa29e';
-import { createBannerUI } from '../bannerui.js?v=cd1fa29e';
-import { renderBracket } from '../render.js?v=cd1fa29e';
-import { regStats } from '../importer.js?v=cd1fa29e';
-import { esc } from '../util.js?v=cd1fa29e';
-import { toast, modal, confirmDlg, pageHead } from './ui.js?v=cd1fa29e';
+import { S, saveBanner, saveSettings, saveBracket, emit, teamNames, publicTeamsPayload } from './state.js?v=108fb9d5';
+import { analyze, allMatches, matchTitle, roundNames, setResult, clearResult, setScores, setTime, autoTimes, getNode, playOrder, publicView, teamCount } from '../bracket.js?v=108fb9d5';
+import { withDefaults, resolveNext, liveText, extraLines, BANNER_DEFAULTS } from '../banner.js?v=108fb9d5';
+import { createBannerUI } from '../bannerui.js?v=108fb9d5';
+import { renderBracket } from '../render.js?v=108fb9d5';
+import { regStats } from '../importer.js?v=108fb9d5';
+import { esc } from '../util.js?v=108fb9d5';
+import { toast, modal, confirmDlg, pageHead } from './ui.js?v=108fb9d5';
 
 let timer = null;
 let pvUI = null; // 看板預覽

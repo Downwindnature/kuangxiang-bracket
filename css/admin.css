@@ -358,6 +358,14 @@ button.mini { padding: 2px 9px; font-size: 12px; font-weight: 600; border-radius
 .pl-info .name { font-size: 19px; font-weight: 800; }
 .pl-info .gid { letter-spacing: .5px; }
 .pl-info dd .hint { margin-top: 4px; }
+.pl-info dd.editing { padding: 10px 12px; margin: -6px 0; border-radius: 10px; background: rgba(70, 50, 160, .16); border: 1px solid rgba(150, 130, 255, .3); }
+.pl-info .ed-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pl-info .ed-row input { flex: 1; min-width: 150px; }
+.pl-info .ed-row button.mini { margin-left: 0; padding: 6px 12px; font-size: 13px; }
+.pl-info .ed-row + .hint, .pl-info .hint + .ed-row { margin-top: 8px; }
+.pl-info label.ed-l { flex-direction: row; align-items: center; gap: 10px; margin: 4px 0; font-size: 13px; color: var(--ink-2); }
+.pl-info label.ed-l input, .pl-info label.ed-l select { flex: 1; min-width: 0; }
+.pl-info label.ed-l[hidden] { display: none; }
 .pi-more { margin-top: 18px; padding-top: 12px; border-top: 1px solid rgba(150, 130, 255, .2); }
 .pi-more #piSetBtn.on { background: rgba(110, 85, 230, .35); }
 .pi-set { margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: rgba(70, 50, 160, .16); border: 1px solid rgba(150, 130, 255, .25); }
