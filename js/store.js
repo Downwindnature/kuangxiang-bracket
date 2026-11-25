@@ -1,5 +1,5 @@
 // store.js — 資料層：有設定 Firebase 就用 Realtime Database，沒有就用單機測試模式（localStorage）
-import { FIREBASE_CONFIG, ACCOUNT_DOMAIN, DB_ROOT } from './firebase-config.js?v=7ec8e333';
+import { FIREBASE_CONFIG, ACCOUNT_DOMAIN, DB_ROOT } from './firebase-config.js?v=cd1fa29e';
 
 const FB = 'https://www.gstatic.com/firebasejs/13.4.0/';
 

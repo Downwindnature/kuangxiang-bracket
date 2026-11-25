@@ -1,8 +1,8 @@
 // bannerui.js — 把看板內容畫到畫面上（前台、後台預覽、抽籤球畫面共用）
 // 一般樣式：內容換了才重畫（有進場動畫），額外句子放右下角輪流顯示
 // 跑馬燈樣式：所有句子排成一列由右往左捲動；內容換了（換場、公布結果…）就淡出、從頭換成新內容
-import { bannerView, marqueeSegments, withDefaults, liveText, extraLines, extraIndex } from './banner.js?v=7ec8e333';
-import { fitText } from './util.js?v=7ec8e333';
+import { bannerView, marqueeSegments, withDefaults, liveText, extraLines, extraIndex } from './banner.js?v=cd1fa29e';
+import { fitText } from './util.js?v=cd1fa29e';
 
 const SPEED = { slow: 90, normal: 150, fast: 230 };
 export function marqueeSpeed(v) {

@@ -355,7 +355,7 @@ button.mini { padding: 2px 9px; font-size: 12px; font-weight: 600; border-radius
 .pl-info dl { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 12px 14px; margin: 2px 0 0; align-items: baseline; }
 .pl-info dt { color: var(--ink-3); font-size: 13px; }
 .pl-info dd { margin: 0; word-break: break-all; }
-.pl-info dd.name { font-size: 19px; font-weight: 800; }
+.pl-info .name { font-size: 19px; font-weight: 800; }
 .pl-info .gid { letter-spacing: .5px; }
 .pl-info dd .hint { margin-top: 4px; }
 .pi-more { margin-top: 18px; padding-top: 12px; border-top: 1px solid rgba(150, 130, 255, .2); }

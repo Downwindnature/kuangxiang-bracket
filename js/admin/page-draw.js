@@ -1,15 +1,15 @@
 // admin/page-draw.js — 選手抽籤：組隊媒合 → 賽程抽籤（含輪空設定）→ 公布／逐一揭曉
-import { S, saveTeams, saveBracket, saveBanner, saveSettings, saveDraw, snapshot, emit, rm, teamNames } from './state.js?v=7ec8e333';
-import { buildTeams, refreshTeams, swapMembers, memberInfo, teamComplete, regMap } from '../matcher.js?v=7ec8e333';
-import { matchOptions, drawOptions } from './power.js?v=7ec8e333';
-import { createBracket, analyze, makeMask, byeSummary, roundCounts, roundNames, swapLeaves, publicView, teamCount, hasResults, MODE_ODD, MODE_POW2, MAX_TEAMS } from '../bracket.js?v=7ec8e333';
-import { renderBracket } from '../render.js?v=7ec8e333';
-import { regStats } from '../importer.js?v=7ec8e333';
-import { withDefaults, DRAW_FX } from '../banner.js?v=7ec8e333';
-import * as L from './livedraw.js?v=7ec8e333';
-import { esc } from '../util.js?v=7ec8e333';
-import { toast, confirmDlg, pageHead } from './ui.js?v=7ec8e333';
-import { rosterTag } from './page-import.js?v=7ec8e333';
+import { S, saveTeams, saveBracket, saveBanner, saveSettings, saveDraw, snapshot, emit, rm, teamNames } from './state.js?v=cd1fa29e';
+import { buildTeams, refreshTeams, swapMembers, memberInfo, teamComplete, regMap } from '../matcher.js?v=cd1fa29e';
+import { matchOptions, drawOptions } from './power.js?v=cd1fa29e';
+import { createBracket, analyze, makeMask, byeSummary, roundCounts, roundNames, swapLeaves, publicView, teamCount, hasResults, MODE_ODD, MODE_POW2, MAX_TEAMS } from '../bracket.js?v=cd1fa29e';
+import { renderBracket } from '../render.js?v=cd1fa29e';
+import { regStats } from '../importer.js?v=cd1fa29e';
+import { withDefaults, DRAW_FX } from '../banner.js?v=cd1fa29e';
+import * as L from './livedraw.js?v=cd1fa29e';
+import { esc } from '../util.js?v=cd1fa29e';
+import { toast, confirmDlg, pageHead } from './ui.js?v=cd1fa29e';
+import { rosterTag } from './page-import.js?v=cd1fa29e';
 
 let busyTimer = null;
 let onSpy = null;

@@ -1,13 +1,13 @@
 // admin/page-players.js — 選手列表：每位選手的遊戲名稱、遊戲 ID、Discord、所屬隊伍
-// 點選手 → 選手資料（可複製 ID／Discord、編輯報名資料）。右上角「⚙ 設定」裡有進階功能，預設關閉；
+// 點選手 → 選手資料（每一項都可以複製、編輯報名資料）。右上角「⚙ 設定」裡有進階功能，預設關閉；
 // 開啟後每位選手資料裡才會多一個「⚙ 設定」，列表本身看起來完全一樣。
-import { S, rm } from './state.js?v=7ec8e333';
-import { toast, modal, confirmDlg, pageHead } from './ui.js?v=7ec8e333';
-import { esc } from '../util.js?v=7ec8e333';
-import { teamLabel } from '../matcher.js?v=7ec8e333';
-import * as I from '../importer.js?v=7ec8e333';
-import { openRegDialog } from './page-import.js?v=7ec8e333';
-import * as P from './power.js?v=7ec8e333';
+import { S, rm } from './state.js?v=cd1fa29e';
+import { toast, modal, confirmDlg, pageHead } from './ui.js?v=cd1fa29e';
+import { esc } from '../util.js?v=cd1fa29e';
+import { teamLabel } from '../matcher.js?v=cd1fa29e';
+import * as I from '../importer.js?v=cd1fa29e';
+import { openRegDialog } from './page-import.js?v=cd1fa29e';
+import * as P from './power.js?v=cd1fa29e';
 
 const COLS = [['nick', '遊戲名稱'], ['gid', '遊戲 ID'], ['discord', 'Discord'], ['team', '所屬隊伍']];
 const dim = (t) => `<span class="dim">${t}</span>`;
@@ -183,10 +183,10 @@ function openPlayer(main, x) {
   const draw = () => {
     box.innerHTML = `
       <dl>
-        <dt>遊戲名稱</dt><dd class="name">${esc(x.p.nick) || dim('（未填）')}</dd>
+        <dt>遊戲名稱</dt><dd>${x.p.nick ? `<span class="name">${esc(x.p.nick)}</span>${copyBtn(x.p.nick)}` : dim('（未填）')}</dd>
         <dt>遊戲 ID</dt><dd>${x.p.gid ? `<span class="gid">${esc(x.p.gid)}</span>${copyBtn(x.p.gid)}` : dim('—')}</dd>
         <dt>Discord</dt><dd>${dcDetail(x)}</dd>
-        <dt>所屬隊伍</dt><dd>${teamCell(x)}</dd>
+        <dt>所屬隊伍</dt><dd>${teamCell(x)}${x.team.text ? copyBtn(x.team.text) : ''}</dd>
       </dl>
       ${P.isOn() ? '<div class="pi-more"><button type="button" class="ghost" id="piSetBtn">⚙ 設定</button><div class="pi-set" id="piSet" hidden></div></div>' : ''}`;
     box.onclick = (e) => {
