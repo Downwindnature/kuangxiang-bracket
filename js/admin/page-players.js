@@ -1,13 +1,13 @@
 // admin/page-players.js — 選手列表：每位選手的遊戲名稱、遊戲 ID、Discord、所屬隊伍
 // 點選手 → 選手資料（每一項都可以直接修改、複製；也可以打開完整的報名資料）。右上角「⚙ 設定」裡有進階功能，預設關閉；
 // 開啟後每位選手資料裡才會多一個「⚙ 設定」，列表本身看起來完全一樣。
-import { S, rm, emit, saveRegs, saveTeams } from './state.js?v=f641a603';
-import { toast, modal, confirmDlg, pageHead } from './ui.js?v=f641a603';
-import { esc } from '../util.js?v=f641a603';
-import { teamLabel, swapMembers } from '../matcher.js?v=f641a603';
-import * as I from '../importer.js?v=f641a603';
-import { openRegDialog } from './page-import.js?v=f641a603';
-import * as P from './power.js?v=f641a603';
+import { S, rm, emit, saveRegs, saveTeams, liveBench, benchSet } from './state.js?v=6c54854c';
+import { toast, modal, confirmDlg, pageHead } from './ui.js?v=6c54854c';
+import { esc } from '../util.js?v=6c54854c';
+import { teamLabel, movePlayer, memberInfo } from '../matcher.js?v=6c54854c';
+import * as I from '../importer.js?v=6c54854c';
+import { openRegDialog } from './page-import.js?v=6c54854c';
+import * as P from './power.js?v=6c54854c';
 
 const COLS = [['nick', '遊戲名稱'], ['gid', '遊戲 ID'], ['discord', 'Discord'], ['team', '所屬隊伍']];
 const dim = (t) => `<span class="dim">${t}</span>`;
@@ -24,22 +24,29 @@ function discordOf(r, i) {
   return { kind: 'empty', text: '' };
 }
 
-function teamOf(r, t, m) {
-  if (t) return { text: teamLabel(t, m, 'team'), note: t.include ? '' : '沒湊滿 3 人' };
-  if (r.type === 3) return { text: r.teamName || '', note: r.teamName ? (S.teams.length ? '尚未加入' : '') : '未填隊名' };
-  return { text: '', note: '' };
+// state：team = 在隊伍裡、reg = 還沒組隊（照 3 人報名的隊名）、bench = 無隊伍、none = 尚未分隊
+function teamOf(r, t, m, benched) {
+  if (t) {
+    const n = t.members.length;
+    return { state: 'team', text: teamLabel(t, m, 'team'), note: t.include ? '' : n < 3 ? '沒湊滿 3 人' : n > 3 ? `多 ${n - 3} 人` : '不參加抽籤' };
+  }
+  if (benched) return { state: 'bench', text: '', note: '' };
+  if (r.type === 3) return { state: 'reg', text: r.teamName || '', note: r.teamName ? (S.teams.length ? '尚未加入' : '') : '未填隊名' };
+  return { state: 'none', text: '', note: '' };
 }
+const teamWord = (tm) => tm.text || (tm.state === 'bench' ? '無隊伍' : tm.state === 'none' ? '尚未分隊' : '');
 
 function allRows() {
   const m = rm();
   const where = {};
   for (const t of S.teams) t.members.forEach((ref) => { where[`${ref.r}#${ref.i}`] = t; });
+  const out = benchSet();
   const rows = [];
   S.regs.forEach((r, ri) => {
     if (r.excluded) return;
     r.players.forEach((p, i) => {
       const t = where[`${r.id}#${i}`] || null;
-      rows.push({ r, ri, i, p, t, team: teamOf(r, t, m), dc: discordOf(r, i) });
+      rows.push({ r, ri, i, p, t, team: teamOf(r, t, m, out.has(`${r.id}#${i}`)), dc: discordOf(r, i) });
     });
   });
   return rows;
@@ -69,7 +76,7 @@ export function render(main) {
 
 function sorted(rows) {
   const q = (S.ui.plQuery || '').trim().toLowerCase();
-  let list = q ? rows.filter((x) => [x.p.nick, x.p.gid, x.dc.text, x.team.text].join(' ').toLowerCase().includes(q)) : rows.slice();
+  let list = q ? rows.filter((x) => [x.p.nick, x.p.gid, x.dc.text, teamWord(x.team)].join(' ').toLowerCase().includes(q)) : rows.slice();
   const { k, d } = S.ui.plSort || { k: 'reg', d: 1 };
   if (k === 'reg') return list;
   const val = (x) => (k === 'nick' ? x.p.nick : k === 'gid' ? x.p.gid : k === 'discord' ? x.dc.text : x.team.text) || '';
@@ -91,7 +98,8 @@ function dcCell(x) {
 }
 
 function teamCell(x) {
-  const { text, note } = x.team;
+  const { text, note, state } = x.team;
+  if (state === 'bench') return dim('無隊伍');
   if (!text && !note) return dim('尚未分隊');
   return `${text ? esc(text) : ''}${note ? ` <span class="dim sm">${text ? '・' : ''}${note}</span>` : ''}`;
 }
@@ -136,7 +144,7 @@ function drawTable(main) {
 function exportCsv() {
   const lines = [COLS.map(([, l]) => l.replace(/\s+/g, ''))];
   for (const x of sorted(allRows())) {
-    const team = x.team.text || (x.team.note ? '' : '尚未分隊');
+    const team = teamWord(x.team);
     lines.push([x.p.nick, x.p.gid, x.dc.text, team]);
   }
   const csv = '﻿' + lines.map((l) => l.map((v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
@@ -189,7 +197,6 @@ function openPlayer(main, x0) {
   box.className = 'pl-info';
   const refresh = () => { x = allRows().find((y) => rowKey(y) === key) || x; };
   const m = () => rm();
-  const teamEditable = () => !!x.t || x.r.type === 3;
 
   const field = (f, label, view) => `<dt>${label}</dt><dd data-f="${f}" class="${editing === f ? 'editing' : ''}">${editing === f ? editor(f) : view}</dd>`;
   const textEditor = (value, attrs, hint) => `
@@ -205,19 +212,31 @@ function openPlayer(main, x0) {
         : `這位選手自己的 Discord${x.r.discord ? `（同一筆報名填的是 ${esc(x.r.discord)}）` : ''}；留空 = 沒有`;
       return textEditor(mine, 'placeholder="Discord 使用者名稱" maxlength="40"', hint);
     }
-    // 所屬隊伍
-    const t = x.t;
-    const cur = t ? t.name || '' : x.r.teamName || '';
-    const ph = t ? teamLabel(Object.assign({}, t, { name: '' }), m(), 'team') : '隊伍名稱';
-    const others = t ? S.teams.filter((y) => y.id !== t.id) : [];
-    const mates = t ? Math.max(0, t.members.length - 1) : Math.max(0, x.r.players.length - 1);
+    // 所屬隊伍：只動這一位選手（除非選了交換），其他隊友不受影響
+    const label = (t) => teamLabel(t, m(), 'team');
+    const benched = x.team.state === 'bench';
+    if (!S.teams.length) {
+      return `
+        <label class="ed-l">所屬隊伍 <select id="edMove">
+          <option value="">${x.r.type === 3 ? `照報名（${esc(x.r.teamName || '未填隊名')}）` : '照報名（等隨機媒合）'}</option>
+          <option value="__bench" ${benched ? 'selected' : ''}>無隊伍</option>
+        </select></label>
+        <div class="hint">還沒組隊。設成「無隊伍」的選手，之後「隨機媒合組隊」不會把他分進任何隊伍；組好隊之後，就可以單獨換到別隊。</div>
+        <div class="ed-row"><button type="button" class="mini primary" data-ed="save">儲存</button><button type="button" class="mini ghost" data-ed="cancel">取消</button></div>`;
+    }
+    const cur = x.t ? x.t.id : benched ? '__bench' : '';
     return `
-      <label class="ed-l">隊名 <input id="edName" value="${esc(cur)}" placeholder="${esc(ph)}" maxlength="40"></label>
-      <div class="hint">${mates ? `同隊的 ${mates} 位選手會一起改。` : ''}${t ? '' : '還沒組隊，改的是報名時填的隊名。'}</div>
-      ${others.length ? `
-        <label class="ed-l">換到 <select id="edMove"><option value="">（不換隊）</option>${others.map((y) => `<option value="${esc(y.id)}">${esc(teamLabel(y, m(), 'team'))}（${y.members.length} 人${y.include ? '' : '，不參加抽籤'}）</option>`).join('')}</select></label>
-        <label class="ed-l" id="edSwapL" hidden>跟誰交換 <select id="edSwap"></select></label>
-        <div class="hint" id="edMoveHint"></div>` : ''}
+      <label class="ed-l">所屬隊伍 <select id="edMove">
+        ${!x.t && !benched ? '<option value="" selected>（還沒分隊）</option>' : ''}
+        <option value="__bench" ${cur === '__bench' ? 'selected' : ''}>無隊伍</option>
+        ${S.teams.map((y) => `<option value="${esc(y.id)}" ${cur === y.id ? 'selected' : ''}>${esc(label(y))}（${y.members.length} 人${cur === y.id ? '・目前' : y.include ? '' : '・不參加抽籤'}）</option>`).join('')}
+      </select></label>
+      <div id="edHow" class="ed-how" hidden>
+        <label class="chk"><input type="radio" name="edHow" value="alone" checked> <span id="edAlone">單獨加入</span></label>
+        <label class="chk"><input type="radio" name="edHow" value="swap"> 跟這隊的 <select id="edSwap"></select> 交換</label>
+      </div>
+      <div class="hint" id="edMoveHint"></div>
+      <div class="hint">隊名要到「選手抽籤」的隊伍卡片上改。</div>
       <div class="ed-row"><button type="button" class="mini primary" data-ed="save">儲存</button><button type="button" class="mini ghost" data-ed="cancel">取消</button></div>`;
   };
 
@@ -228,7 +247,7 @@ function openPlayer(main, x0) {
         ${field('nick', '遊戲名稱', `${x.p.nick ? `<span class="name">${esc(x.p.nick)}</span>${copyBtn(x.p.nick)}` : dim('（未填）')}${editBtn('nick')}`)}
         ${field('gid', '遊戲 ID', `${x.p.gid ? `<span class="gid">${esc(x.p.gid)}</span>${copyBtn(x.p.gid)}` : dim('—')}${editBtn('gid')}`)}
         ${field('discord', 'Discord', `${dc.main}${editBtn('discord')}${dc.hint ? `<div class="hint">${dc.hint}</div>` : ''}`)}
-        ${field('team', '所屬隊伍', `${teamCell(x)}${x.team.text ? copyBtn(x.team.text) : ''}${teamEditable() ? editBtn('team') : ''}`)}
+        ${field('team', '所屬隊伍', `${teamCell(x)}${x.team.text ? copyBtn(x.team.text) : ''}${editBtn('team')}`)}
       </dl>
       ${P.isOn() ? '<div class="pi-more"><button type="button" class="ghost" id="piSetBtn">⚙ 設定</button><div class="pi-set" id="piSet" hidden></div></div>' : ''}`;
     const btn = box.querySelector('#piSetBtn');
@@ -239,33 +258,51 @@ function openPlayer(main, x0) {
       if (!el.hidden) drawSet(el);
     };
     const mv = box.querySelector('#edMove');
-    if (mv) mv.onchange = () => onMovePick();
-    const inp = box.querySelector('#edIn') || box.querySelector('#edName');
-    if (inp) { inp.focus(); inp.select(); }
+    if (mv) { mv.onchange = () => onMovePick(); onMovePick(); }
+    box.querySelectorAll('input[name="edHow"]').forEach((r) => { r.onchange = () => onMovePick(); });
+    const sw = box.querySelector('#edSwap');
+    if (sw) sw.onchange = () => { box.querySelector('input[name="edHow"][value="swap"]').checked = true; onMovePick(); };
+    const inp = box.querySelector('#edIn');
+    if (inp) { inp.focus(); inp.select(); } else if (mv) mv.focus();
   };
 
-  // 選了要換去的隊伍：滿 3 人就要選跟誰交換；換隊時不能同時改隊名
+  // 選了要去的地方：說明會發生什麼事；對方 3 人以上時可以選「單獨加入」或「交換」
   const onMovePick = () => {
-    const id = box.querySelector('#edMove').value;
-    const target = S.teams.find((y) => y.id === id);
-    const swapL = box.querySelector('#edSwapL');
-    const name = box.querySelector('#edName');
-    name.disabled = !!target;
-    swapL.hidden = !(target && target.members.length >= 3);
-    if (target && target.members.length >= 3) {
-      box.querySelector('#edSwap').innerHTML = `<option value="">（請選擇）</option>${target.members.map((ref, i) => {
-        const r = m()[ref.r];
-        const nick = (r && r.players[ref.i] && r.players[ref.i].nick) || '（未填）';
-        return `<option value="${i}">${esc(nick)}${i === target.cap ? '（隊長）' : ''}</option>`;
-      }).join('')}`;
+    const mv = box.querySelector('#edMove');
+    const hintEl = box.querySelector('#edMoveHint');
+    if (!mv || !hintEl) return;
+    const v = mv.value;
+    const label = (t) => `「${esc(teamLabel(t, m(), 'team'))}」`;
+    const target = S.teams.find((y) => y.id === v) || null;
+    const same = (x.t && v === x.t.id) || (v === '__bench' && x.team.state === 'bench') || v === '';
+    const how = box.querySelector('#edHow');
+    const full = target && !same && target.members.length >= 3;
+    how.hidden = !full;
+    if (full) {
+      box.querySelector('#edAlone').textContent = `單獨加入（這隊會變 ${target.members.length + 1} 人，先不參加抽籤，之後再調整）`;
+      const sw = box.querySelector('#edSwap');
+      if (sw.dataset.team !== target.id) {
+        sw.dataset.team = target.id;
+        sw.innerHTML = target.members.map((ref, i) => {
+          const info = memberInfo(m(), ref);
+          return `<option value="${i}">${esc((info && info.nick) || '（未填）')}${i === target.cap ? '（隊長）' : ''}</option>`;
+        }).join('');
+      }
     }
+    const swap = full && box.querySelector('input[name="edHow"]:checked').value === 'swap';
     const notes = [];
-    if (target) {
-      if (target.members.length < 3) notes.push(`會移到 ${esc(teamLabel(target, m(), 'team'))} 的空位，原本的隊伍會少一個人。`);
-      if (x.r.type === 2) notes.push('這位是 2 人報名，換隊會跟搭檔分開。');
-      if (x.t && x.t.origin === 'self') notes.push('這是自己組的隊伍，換隊後原本的隊伍會拆開。');
+    if (!same) {
+      if (swap) {
+        const other = memberInfo(m(), target.members[Number(box.querySelector('#edSwap').value)] || {});
+        notes.push(`${esc((other && other.nick) || '對方')} 會${x.t ? `換到${label(x.t)}` : '變成無隊伍'}，兩隊人數不變。`);
+      } else {
+        if (x.t) notes.push(`原本的${label(x.t)}會剩 ${x.t.members.length - 1} 人${x.t.include && x.t.members.length === 3 ? '，先不參加抽籤（湊回 3 人會自動回到抽籤名單）' : ''}。`);
+        if (target && target.members.length < 3) notes.push(`會加入${label(target)}的空位（變 ${target.members.length + 1} 人）。`);
+        if (v === '__bench') notes.push('之後「重新隨機媒合」「補進新報名的選手」都不會把他分進隊伍，要再到這裡選隊伍。');
+      }
+      if (x.r.type === 2 && x.t) notes.push('這位是 2 人報名，會跟搭檔分開。');
     }
-    box.querySelector('#edMoveHint').innerHTML = notes.join('<br>');
+    hintEl.innerHTML = notes.join('<br>');
   };
 
   const done = (msg, type) => {
@@ -307,52 +344,62 @@ function openPlayer(main, x0) {
   };
 
   const saveTeam = async () => {
-    const t = x.t;
-    const mv = box.querySelector('#edMove');
-    const target = mv && mv.value ? S.teams.find((y) => y.id === mv.value) : null;
-    if (target && t) {
-      const from = { team: t.id, idx: t.members.findIndex((ref) => ref.r === x.r.id && ref.i === x.i) };
-      let to = { team: target.id, idx: target.members.length };
-      if (target.members.length >= 3) {
-        const sv = box.querySelector('#edSwap').value;
-        if (sv === '') { toast('請選擇要跟誰交換', { type: 'warn' }); return; }
-        to = { team: target.id, idx: Number(sv) };
-      }
-      const next = swapMembers(S.teams, from, to);
-      const inBr = new Set(S.bracket ? S.bracket.leaves.filter(Boolean) : []);
-      const lost = S.teams.filter((y) => inBr.has(y.id) && y.include && !(next.find((z) => z.id === y.id) || {}).include);
-      if (lost.length && !(await confirmDlg(`${lost.map((y) => `「${teamLabel(y, m(), 'team')}」`).join('、')}換完會不滿 3 人、不再參加抽籤，目前的賽程需要重新抽籤。確定要換嗎？`, { danger: true, ok: '換隊' }))) return;
-      S.teams = next;
+    const v = box.querySelector('#edMove').value;
+    const ref = { r: x.r.id, i: x.i };
+    const benched = x.team.state === 'bench';
+    // 還沒組隊：只有「照報名」和「無隊伍」
+    if (!S.teams.length) {
+      const want = v === '__bench';
+      if (want === benched) return done();
+      S.bench = want ? liveBench().concat([ref]) : liveBench().filter((y) => !(y.r === ref.r && y.i === ref.i));
       await saveTeams();
       emit('teams');
-      const notes = [];
-      const src = next.find((z) => z.id === t.id);
-      if (!src) notes.push(`「${teamLabel(t, m(), 'team')}」已經沒有人`);
-      else if (!src.include && t.include) notes.push(`「${teamLabel(src, m(), 'team')}」剩 ${src.members.length} 人，不參加抽籤`);
-      const tg = next.find((z) => z.id === target.id);
-      if (tg && tg.members.length === 3 && !tg.include) notes.push(`「${teamLabel(tg, m(), 'team')}」滿 3 人了，要參加抽籤請到「選手抽籤」勾選`);
-      return done(`已換隊${notes.length ? `（${notes.join('；')}）` : ''}`, notes.length ? 'warn' : undefined);
+      return done(want ? '已設成無隊伍' : '已改回照報名');
     }
-    const name = box.querySelector('#edName').value.trim();
-    if (t) {
-      if (name === (t.name || '')) return done();
-      S.teams = S.teams.map((y) => (y.id === t.id ? Object.assign({}, y, { name, autoName: false }) : y));
-      // 自己組的隊伍：報名資料上的隊名也一起改（之後重新媒合、重新組隊都會沿用）
-      const own = t.origin === 'self' && t.members[0] ? S.regs.find((y) => y.id === t.members[0].r && y.type === 3) : null;
-      if (own && own.teamName !== name) {
-        S.regs = S.regs.map((y) => (y.id === own.id ? Object.assign({}, y, { teamName: name }, y.src !== 'manual' ? { edited: true } : {}) : y));
-        await saveRegs();
-        emit('regs');
-      }
-      await saveTeams();
-      emit('teams');
-      return done('已儲存');
+    if (v === '' || (x.t && v === x.t.id) || (v === '__bench' && benched)) return done();
+    let dest = { bench: true };
+    const target = v === '__bench' ? null : S.teams.find((y) => y.id === v);
+    if (target) {
+      dest = { team: target.id };
+      const how = box.querySelector('input[name="edHow"]:checked');
+      if (target.members.length >= 3 && how && how.value === 'swap') dest.swap = Number(box.querySelector('#edSwap').value);
     }
-    if (name === (x.r.teamName || '')) return done();
-    S.regs = S.regs.map((y) => (y.id === x.r.id ? Object.assign({}, y, { teamName: name }, y.src !== 'manual' ? { edited: true } : {}) : y));
-    await saveRegs();
-    emit('regs');
-    done('已儲存');
+    const res = movePlayer(S.teams, liveBench(), ref, dest);
+    const label = (t) => `「${teamLabel(t, m(), 'team')}」`;
+    const inBr = new Set(S.bracket ? S.bracket.leaves.filter(Boolean) : []);
+    const wasIn = (id) => !!(S.teams.find((y) => y.id === id) || {}).include;
+    const lost = S.teams.filter((y) => inBr.has(y.id) && y.include && !(res.teams.find((z) => z.id === y.id) || {}).include);
+    const gained = S.bracket ? res.teams.filter((z) => z.include && !wasIn(z.id) && !inBr.has(z.id)) : [];
+    if (lost.length || gained.length) {
+      const parts = [];
+      if (lost.length) parts.push(`${lost.map(label).join('、')}換完人數不是 3 人，會先不參加抽籤`);
+      if (gained.length) parts.push(`${gained.map(label).join('、')}湊滿 3 人，會回到抽籤名單`);
+      if (!(await confirmDlg(`${parts.join('；')}。目前抽好的賽程需要重新抽籤。確定要換嗎？`, { danger: true, ok: '確定' }))) return;
+    }
+    const before = S.teams;
+    S.teams = res.teams;
+    S.bench = res.bench;
+    await saveTeams();
+    emit('teams');
+    const notes = [];
+    if (x.t) {
+      const src = res.teams.find((z) => z.id === x.t.id);
+      if (!src) notes.push(`${label(x.t)}已經沒有人`);
+      else if (!src.include && x.t.include) notes.push(`${label(src)}剩 ${src.members.length} 人，先不參加抽籤`);
+      else if (src.include && !x.t.include) notes.push(`${label(src)}湊回 3 人，回到抽籤名單`);
+    }
+    if (target && dest.swap == null) {
+      const tg = res.teams.find((z) => z.id === target.id);
+      if (tg && tg.members.length > 3) notes.push(`${label(tg)}現在 ${tg.members.length} 人，先不參加抽籤`);
+      else if (tg && tg.include && !target.include) notes.push(`${label(tg)}湊滿 3 人，回到抽籤名單`);
+      else if (tg && tg.members.length === 3 && !tg.include) notes.push(`${label(tg)}滿 3 人了，要參加抽籤請到「選手抽籤」勾選`);
+    }
+    if (target && dest.swap != null && !x.t) {
+      const other = memberInfo(rm(), (before.find((z) => z.id === target.id) || { members: [] }).members[dest.swap] || {});
+      notes.push(`${(other && other.nick) || '對方'} 變成無隊伍`);
+    }
+    const msg = dest.bench ? '已設成無隊伍' : dest.swap != null ? '已交換' : '已換隊';
+    return done(`${msg}${notes.length ? `（${notes.join('；')}）` : ''}`, notes.length ? 'warn' : undefined);
   };
 
   const save = async () => {

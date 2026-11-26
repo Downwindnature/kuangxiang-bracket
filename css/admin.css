@@ -218,6 +218,8 @@ details summary { cursor: pointer; color: var(--ink-2); margin: 8px 0; }
 .tcard { border-radius: 12px; padding: 10px 12px; background: rgba(40, 30, 120, .55); border: 1px solid rgba(150, 130, 255, .35); }
 .tcard.off { opacity: .7; border-style: dashed; }
 .tcard.incomplete { border-color: rgba(255, 170, 40, .6); }
+.tcard.bench { background: rgba(20, 14, 60, .55); border-style: dashed; border-color: rgba(165, 145, 255, .45); }
+.tcard.bench .tc-head b { font-size: 15px; }
 .tc-head { display: flex; gap: 6px; align-items: center; }
 .tc-name { flex: 1; font-weight: 800; font-size: 15px; }
 .tc-mem { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -367,6 +369,10 @@ button.mini { padding: 2px 9px; font-size: 12px; font-weight: 600; border-radius
 .pl-info label.ed-l { flex-direction: row; align-items: center; gap: 10px; margin: 4px 0; font-size: 13px; color: var(--ink-2); }
 .pl-info label.ed-l input, .pl-info label.ed-l select { flex: 1; min-width: 0; }
 .pl-info label.ed-l[hidden] { display: none; }
+.pl-info .ed-how { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 2px; padding-left: 4px; }
+.pl-info .ed-how[hidden] { display: none; }
+.pl-info .ed-how label.chk { font-size: 13px; color: var(--ink); margin: 2px 0; }
+.pl-info .ed-how select { margin: 0 4px; padding: 3px 6px; }
 .pi-more { margin-top: 18px; padding-top: 12px; border-top: 1px solid rgba(150, 130, 255, .2); }
 .pi-more #piSetBtn.on { background: rgba(110, 85, 230, .35); }
 .pi-set { margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: rgba(70, 50, 160, .16); border: 1px solid rgba(150, 130, 255, .25); }

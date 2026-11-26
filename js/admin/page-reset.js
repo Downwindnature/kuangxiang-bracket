@@ -1,7 +1,7 @@
 // admin/page-reset.js — 重置（有「返回」可以復原）與還原紀錄
-import { S, resetAll, listHistory, restoreHistory, deleteHistory, latestResetSnapshot } from './state.js?v=f641a603';
-import { esc, fmtDateTime } from '../util.js?v=f641a603';
-import { toast, confirmDlg, pageHead } from './ui.js?v=f641a603';
+import { S, resetAll, listHistory, restoreHistory, deleteHistory, latestResetSnapshot } from './state.js?v=6c54854c';
+import { esc, fmtDateTime } from '../util.js?v=6c54854c';
+import { toast, confirmDlg, pageHead } from './ui.js?v=6c54854c';
 
 export async function undoLastReset(after) {
   const h = await latestResetSnapshot();

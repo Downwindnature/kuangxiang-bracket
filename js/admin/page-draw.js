@@ -1,15 +1,15 @@
 // admin/page-draw.js — 選手抽籤：組隊媒合 → 賽程抽籤（含輪空設定）→ 公布／逐一揭曉
-import { S, saveTeams, saveBracket, saveBanner, saveSettings, saveDraw, snapshot, emit, rm, teamNames } from './state.js?v=f641a603';
-import { buildTeams, refreshTeams, swapMembers, memberInfo, teamComplete, regMap } from '../matcher.js?v=f641a603';
-import { matchOptions, drawOptions } from './power.js?v=f641a603';
-import { createBracket, analyze, makeMask, byeSummary, roundCounts, roundNames, swapLeaves, publicView, teamCount, hasResults, MODE_ODD, MODE_POW2, MAX_TEAMS } from '../bracket.js?v=f641a603';
-import { renderBracket } from '../render.js?v=f641a603';
-import { regStats } from '../importer.js?v=f641a603';
-import { withDefaults, DRAW_FX } from '../banner.js?v=f641a603';
-import * as L from './livedraw.js?v=f641a603';
-import { esc } from '../util.js?v=f641a603';
-import { toast, confirmDlg, pageHead } from './ui.js?v=f641a603';
-import { rosterTag } from './page-import.js?v=f641a603';
+import { S, saveTeams, saveBracket, saveBanner, saveSettings, saveDraw, snapshot, emit, rm, teamNames, liveBench, benchSet } from './state.js?v=6c54854c';
+import { buildTeams, refreshTeams, swapMembers, movePlayer, refKey, memberInfo, teamComplete, regMap } from '../matcher.js?v=6c54854c';
+import { matchOptions, drawOptions } from './power.js?v=6c54854c';
+import { createBracket, analyze, makeMask, byeSummary, roundCounts, roundNames, swapLeaves, publicView, teamCount, hasResults, MODE_ODD, MODE_POW2, MAX_TEAMS } from '../bracket.js?v=6c54854c';
+import { renderBracket } from '../render.js?v=6c54854c';
+import { regStats } from '../importer.js?v=6c54854c';
+import { withDefaults, DRAW_FX } from '../banner.js?v=6c54854c';
+import * as L from './livedraw.js?v=6c54854c';
+import { esc } from '../util.js?v=6c54854c';
+import { toast, confirmDlg, pageHead } from './ui.js?v=6c54854c';
+import { rosterTag } from './page-import.js?v=6c54854c';
 
 let busyTimer = null;
 let onSpy = null;
@@ -89,18 +89,35 @@ function drawTeams(main) {
       <ol class="tc-mem">${slots}${empties}</ol>
       <div class="tc-foot">
         <label class="chk"><input type="checkbox" class="tc-inc" data-team="${t.id}" ${t.include ? 'checked' : ''}> 參加抽籤</label>
-        ${!complete ? '<span class="tag warn">人數不足</span>' : ''}${t.capPending ? '<span class="tag dim">隊長待確認</span>' : ''}
+        ${!complete ? `<span class="tag warn">${t.members.length > 3 ? `多 ${t.members.length - 3} 人` : '人數不足'}</span>` : ''}${t.capPending ? '<span class="tag dim">隊長待確認</span>' : ''}
       </div>
     </div>`;
   }).join('');
+  // 沒有隊伍的選手：設成「無隊伍」的，加上組隊之後才報名、還沒補進來的
+  const inTeam = new Set();
+  for (const t of S.teams) for (const x of t.members) inTeam.add(refKey(x));
+  const benched = liveBench().filter((x) => m[x.r] && !m[x.r].excluded);
+  const benchKeys = new Set(benched.map(refKey));
+  const waiting = S.teams.length ? S.regs.filter((r) => !r.excluded).flatMap((r) => r.players.map((_, i) => ({ r: r.id, i }))).filter((x) => !inTeam.has(refKey(x)) && !benchKeys.has(refKey(x))) : [];
+  const loose = benched.map((x) => ({ x, bench: true })).concat(waiting.map((x) => ({ x, bench: false })));
+  const pickedTeam = picked && picked.team;
+  const looseCard = S.teams.length && (loose.length || pickedTeam) ? `<div class="tcard bench" data-bench-card>
+      <div class="tc-head"><b>沒有隊伍的選手</b><span class="tag">${loose.length} 位</span></div>
+      <ol class="tc-mem">${loose.map(({ x, bench }) => {
+        const info = memberInfo(m, x);
+        const isPicked = picked && picked.ref === refKey(x);
+        return `<li class="mem ${isPicked ? 'picked' : ''}" data-ref="${esc(refKey(x))}"><span class="nick">${esc((info && info.nick) || '（未填暱稱）')}</span><span class="gid">${esc((info && info.gid) || '')}</span><span class="tag ${bench ? 'dim' : 'warn'}">${bench ? '無隊伍' : '還沒分隊'}</span></li>`;
+      }).join('')}${pickedTeam ? '<li class="mem empty" data-bench-slot>＋ 移到這裡（無隊伍）</li>' : ''}</ol>
+      ${loose.length ? '<div class="hint">點一位選手，再點隊伍裡的空位（或某位選手）就可以放進隊伍。</div>' : ''}
+    </div>` : '';
   box.innerHTML = `
     <h3>① 組隊媒合</h3>
     <p>報名：3 人隊伍 <b>${st.t3}</b>、2 人報名 <b>${st.t2}</b> 組、1 人報名 <b>${st.t1}</b> 位 → 預計可組成 <b>${st.canTeams}</b> 隊${st.leftPairs || st.leftSingles ? `，候補：${st.leftPairs ? `${st.leftPairs} 組缺 1 人` : ''}${st.leftPairs && st.leftSingles ? '、' : ''}${st.leftSingles ? `${st.leftSingles} 位落單` : ''}` : ''}。</p>
     <div class="btns">
       ${S.teams.length ? `<button id="tRe" class="primary">🎲 重新隨機媒合</button><button id="tAdd">＋ 補進新報名的選手</button><button id="tClear" class="ghost">清空隊伍</button>` : `<button id="tBuild" class="primary" ${S.regs.length ? '' : 'disabled'}>🎲 隨機媒合組隊</button>`}
-      ${S.teams.length ? `<span class="hint">目前 ${S.teams.length} 隊，參加抽籤 ${inc.length} 隊</span>` : ''}
+      ${S.teams.length ? `<span class="hint">目前 ${S.teams.length} 隊，參加抽籤 ${inc.length} 隊${benched.length ? `，無隊伍 ${benched.length} 位` : ''}</span>` : ''}
     </div>
-    ${S.teams.length ? `<p class="hint">點一位選手，再點另一位選手（或空位）就可以交換／移動。★ 是隊長。媒合隊伍的名稱可以直接改。</p><div class="tgrid">${cards}</div>` : (S.regs.length ? '' : '<p class="hint">還沒有報名資料，請先到 <a href="#import">表單匯入</a>。</p>')}`;
+    ${S.teams.length ? `<p class="hint">點一位選手，再點另一位選手（或空位）就可以交換／移動；點選手後再點「沒有隊伍的選手」那一格可以設成無隊伍。★ 是隊長。隊伍名稱可以直接改。</p><div class="tgrid">${cards}${looseCard}</div>` : (S.regs.length ? (benched.length ? `<p class="hint">有 ${benched.length} 位選手設成「無隊伍」，組隊時不會被分進任何隊伍（可以在「選手列表」改回來）。</p>` : '') : '<p class="hint">還沒有報名資料，請先到 <a href="#import">表單匯入</a>。</p>')}`;
 
   const q = (id) => box.querySelector('#' + id);
   const afterTeams = async (msg) => {
@@ -118,19 +135,19 @@ function drawTeams(main) {
     return fresh;
   };
   if (q('tBuild')) q('tBuild').onclick = async () => {
-    S.teams = buildTeams(S.regs, matchOptions());
+    S.teams = buildTeams(S.regs, Object.assign({ skip: benchSet() }, matchOptions()));
     await afterTeams(`已組成 ${S.teams.filter((t) => t.include).length} 隊`);
   };
   if (q('tRe')) q('tRe').onclick = async () => {
     const warn = S.bracket ? '\n\n注意：目前的抽籤結果會被清除（前台賽程也會撤下）。' : '';
     if (!(await confirmDlg(`重新隨機媒合 1 人、2 人報名的選手？自行組隊的 3 人隊伍不會變。${warn}`, { ok: '重新媒合', danger: !!S.bracket }))) return;
     await snapshot('重新媒合前');
-    S.teams = keepSelfIds(buildTeams(S.regs, matchOptions()));
+    S.teams = keepSelfIds(buildTeams(S.regs, Object.assign({ skip: benchSet() }, matchOptions())));
     if (S.bracket) { S.bracket = null; await saveBracket(); }
     await afterTeams('已重新媒合');
   };
   if (q('tAdd')) q('tAdd').onclick = async () => {
-    const r = refreshTeams(S.teams, S.regs, matchOptions());
+    const r = refreshTeams(S.teams, S.regs, Object.assign({ skip: benchSet() }, matchOptions()));
     if (!r.added) { toast('沒有新的選手需要補進來'); S.teams = r.teams; return afterTeams(); }
     S.teams = r.teams;
     await afterTeams(`已補進 ${r.added} 隊（新報名的選手）`);
@@ -163,16 +180,46 @@ function drawTeams(main) {
   box.querySelectorAll('.tc-inc').forEach((c) => {
     c.onchange = async () => {
       const t = S.teams.find((x) => x.id === c.dataset.team);
-      if (c.checked && !teamComplete(t, m) && !(await confirmDlg('這隊不滿 3 人（比賽規則是固定 3 人）。還是要讓它參加抽籤嗎？', { ok: '仍然參加' }))) { c.checked = false; return; }
+      if (c.checked && !teamComplete(t, m) && !(await confirmDlg(`這隊現在是 ${t.members.length} 人（比賽規則是固定 3 人）。還是要讓它參加抽籤嗎？`, { ok: '仍然參加' }))) { c.checked = false; return; }
       t.include = c.checked;
+      delete t.autoOff;                    // 手動勾選／取消之後，就照後台的選擇
       await afterTeams();
     };
   });
+  const toRef = (k) => { const [r, i] = k.split('#'); return { r, i: Number(i) }; };
+  const applyMove = async (ref, dest, msg) => {
+    const res = movePlayer(S.teams, liveBench(), ref, dest);
+    S.teams = res.teams;
+    S.bench = res.bench;
+    await afterTeams(msg);
+  };
   box.querySelectorAll('.mem').forEach((li) => {
     li.addEventListener('click', async (e) => {
       if (e.target.closest('.cap')) return;
-      const here = { team: li.dataset.team, idx: Number(li.dataset.idx) };
       const cur = S.ui.pickMember;
+      // 沒有隊伍的選手那一格
+      if (li.dataset.ref || li.dataset.benchSlot != null) {
+        if (li.dataset.benchSlot != null) {
+          if (!cur || !cur.team) return;
+          S.ui.pickMember = null;
+          const t = S.teams.find((x) => x.id === cur.team);
+          const ref = t && t.members[cur.idx];
+          return ref ? applyMove(ref, { bench: true }, '已設成無隊伍') : drawTeams(main);
+        }
+        if (cur && cur.team) {               // 隊伍裡的人 ⇄ 沒有隊伍的人：交換（隊伍裡的人變無隊伍）
+          S.ui.pickMember = null;
+          return applyMove(toRef(li.dataset.ref), { team: cur.team, swap: cur.idx }, '已交換');
+        }
+        S.ui.pickMember = cur && cur.ref === li.dataset.ref ? null : { ref: li.dataset.ref };
+        drawTeams(main);
+        return;
+      }
+      const here = { team: li.dataset.team, idx: Number(li.dataset.idx) };
+      if (cur && cur.ref) {                  // 沒有隊伍的人 → 隊伍的空位（加入）或某位選手（交換）
+        S.ui.pickMember = null;
+        const dest = li.classList.contains('empty') ? { team: here.team } : { team: here.team, swap: here.idx };
+        return applyMove(toRef(cur.ref), dest, dest.swap == null ? '已加入隊伍' : '已交換');
+      }
       if (!cur) {
         if (li.classList.contains('empty')) return;
         S.ui.pickMember = here;

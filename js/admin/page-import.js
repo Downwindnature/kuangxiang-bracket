@@ -1,8 +1,8 @@
 // admin/page-import.js — 表單匯入：Excel／CSV、Google 表單同步、手動新增、統計與完整資料表
-import { S, saveRegs, saveSync, saveRoster, snapshot, emit } from './state.js?v=f641a603';
-import * as I from '../importer.js?v=f641a603';
-import { esc, fmtDateTime, uid } from '../util.js?v=f641a603';
-import { toast, modal, confirmDlg, busy, pageHead } from './ui.js?v=f641a603';
+import { S, saveRegs, saveSync, saveRoster, snapshot, emit } from './state.js?v=6c54854c';
+import * as I from '../importer.js?v=6c54854c';
+import { esc, fmtDateTime, uid } from '../util.js?v=6c54854c';
+import { toast, modal, confirmDlg, busy, pageHead } from './ui.js?v=6c54854c';
 
 const XLSX_URL = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs';
 let XLSX = null;

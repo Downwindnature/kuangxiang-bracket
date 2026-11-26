@@ -1,10 +1,10 @@
 // admin/state.js — 後台的資料狀態、存檔、發布到前台、還原紀錄
-import { PATHS } from '../store.js?v=f641a603';
-import { parseJSON } from '../util.js?v=f641a603';
-import { publicView, teamCount, clone } from '../bracket.js?v=f641a603';
-import { regMap, teamLabel, memberInfo } from '../matcher.js?v=f641a603';
-import { checkRegs } from '../importer.js?v=f641a603';
-import { withDefaults } from '../banner.js?v=f641a603';
+import { PATHS } from '../store.js?v=6c54854c';
+import { parseJSON } from '../util.js?v=6c54854c';
+import { publicView, teamCount, clone } from '../bracket.js?v=6c54854c';
+import { regMap, teamLabel, memberInfo } from '../matcher.js?v=6c54854c';
+import { checkRegs } from '../importer.js?v=6c54854c';
+import { withDefaults } from '../banner.js?v=6c54854c';
 
 export const SETTINGS_DEFAULTS = {
   title: '',          // 賽事標題：預設留空（前台看板待機時就是空白）
@@ -25,6 +25,7 @@ export const S = {
   user: null,
   regs: [],
   teams: [],
+  bench: [],            // 設成「無隊伍」的選手（{ r, i }）：媒合、補進都不會把他們分進隊伍
   bracket: null,
   settings: Object.assign({}, SETTINGS_DEFAULTS),
   banner: withDefaults(null),
@@ -51,7 +52,9 @@ async function put(path, value) {
 function applyPrivate(p) {
   p = p || {};
   S.regs = checkRegs((parseJSON(p.regs, {}) || {}).list || []);
-  S.teams = (parseJSON(p.teams, {}) || {}).list || [];
+  const tm = parseJSON(p.teams, {}) || {};
+  S.teams = tm.list || [];
+  S.bench = Array.isArray(tm.bench) ? tm.bench : [];
   S.bracket = parseJSON(p.bracket, null);
   S.sync = p.sync || {};
   S.roster = parseJSON(p.roster, null);
@@ -107,8 +110,25 @@ export async function saveRegs() {
   if (S.bracket && S.bracket.published) await publishBracket(); // 改了暱稱：前台賽程上的名字跟著更新
 }
 
+// 無隊伍名單：只留還存在、也不在任何隊伍裡的選手（報名設成不列入的先留著，改回來仍然是無隊伍）
+export function liveBench() {
+  const m = rm();
+  const inTeam = new Set();
+  for (const t of S.teams) for (const x of t.members) inTeam.add(`${x.r}#${x.i}`);
+  const seen = new Set();
+  return (S.bench || []).filter((x) => {
+    const k = `${x.r}#${x.i}`;
+    const r = m[x.r];
+    if (seen.has(k) || inTeam.has(k) || !r || !r.players[x.i]) return false;
+    seen.add(k);
+    return true;
+  });
+}
+export const benchSet = () => new Set(liveBench().map((x) => `${x.r}#${x.i}`));
+
 export async function saveTeams() {
-  await put(PATHS.teams, { list: S.teams, at: Date.now() });
+  S.bench = liveBench();
+  await put(PATHS.teams, { list: S.teams, bench: S.bench, at: Date.now() });
   await publishTeamsIfShown();
   if (S.bracket && S.bracket.published) await publishBracket();
 }
@@ -167,10 +187,12 @@ export function publicTeamsPayload() {
     return { title: '參賽隊伍', teams: inc.map((t) => ({ n: teamLabel(t, m, S.settings.nameMode), m: t.members.map(nick), c: t.cap })), waiting };
   }
   const regs = S.regs.filter((r) => !r.excluded);
+  const out = benchSet();
+  const left = (r) => r.players.filter((_, i) => !out.has(`${r.id}#${i}`));
   return {
     title: '報名隊伍',
-    teams: regs.filter((r) => r.type === 3).map((r) => ({ n: r.teamName || (r.players[0] && r.players[0].nick) || '未命名', m: r.players.map((p) => p.nick), c: 0 })),
-    waiting: regs.filter((r) => r.type !== 3).flatMap((r) => r.players.map((p) => p.nick)).filter(Boolean),
+    teams: regs.filter((r) => r.type === 3 && left(r).length).map((r) => ({ n: r.teamName || (left(r)[0] && left(r)[0].nick) || '未命名', m: left(r).map((p) => p.nick), c: 0 })),
+    waiting: regs.filter((r) => r.type !== 3).flatMap((r) => left(r).map((p) => p.nick)).filter(Boolean),
   };
 }
 
@@ -182,7 +204,7 @@ export async function publishTeamsIfShown() {
 
 // ── 還原紀錄（清單只存摘要，完整資料另外存，打開「重置」頁時不用下載全部備份）──
 export async function snapshot(reason) {
-  const data = JSON.stringify({ regs: S.regs, teams: S.teams, bracket: S.bracket, settings: S.settings, banner: S.banner });
+  const data = JSON.stringify({ regs: S.regs, teams: S.teams, bench: S.bench, bracket: S.bracket, settings: S.settings, banner: S.banner });
   const key = await S.store.push(PATHS.history, {
     at: S.store.now(),
     reason,
@@ -215,11 +237,12 @@ export async function restoreHistory(key) {
   await snapshot('還原前自動備份');
   S.regs = checkRegs(d.regs || []);
   S.teams = d.teams || [];
+  S.bench = d.bench || [];
   S.bracket = d.bracket || null;
   if (d.settings) S.settings = Object.assign({}, SETTINGS_DEFAULTS, d.settings);
   S.banner = withDefaults(d.banner);
   await put(PATHS.regs, { list: S.regs, at: Date.now() });
-  await put(PATHS.teams, { list: S.teams, at: Date.now() });
+  await put(PATHS.teams, { list: S.teams, bench: S.bench, at: Date.now() });
   await put(PATHS.bracket, S.bracket);
   await put(PATHS.pubSettings, S.settings);
   await saveBanner();
@@ -233,6 +256,7 @@ export async function resetAll() {
   await snapshot('重置前');
   S.regs = [];
   S.teams = [];
+  S.bench = [];
   S.bracket = null;
   S.banner = Object.assign(withDefaults(S.banner), { mode: 'idle', cur: null, next: 'auto', at: S.store.now(), draw: null, custom: '' });
   await put(PATHS.regs, { list: [], at: Date.now() });

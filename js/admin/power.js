@@ -1,7 +1,7 @@
 // admin/power.js — 選手列表「⚙ 設定」裡的進階功能：每位選手 0～100 的數值（越高越強）
 // 只存在後台的私人資料區（private/power）。預設關閉：關閉時媒合與抽籤完全照原本的隨機方式。
 // 開啟後也只有「選手列表 ⚙ 設定」和每位選手資料裡的「⚙ 設定」看得到；其他頁面只會默默套用，不顯示任何數字或字眼。
-import { S, savePower } from './state.js?v=f641a603';
+import { S, savePower } from './state.js?v=6c54854c';
 
 export const MAX = 100;
 export const BASE_VALUE = 50;              // 沒有設定的選手當作 50
